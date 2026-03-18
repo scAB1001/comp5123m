@@ -1,0 +1,145 @@
+---
+# 1. HAProxy ConfigMap (The Routing Rules)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+data:
+  haproxy.cfg: |
+    global
+        maxconn 1024
+    defaults
+        timeout connect 5000ms
+        timeout client  50000ms
+        timeout server  50000ms
+    # 5G TCP Throughput Routing
+    frontend iperf_front
+        mode tcp
+        bind *:5201
+        default_backend iperf_back
+    backend iperf_back
+        mode tcp
+        server iperf_srv iperf-server-svc:5201
+    # 5G HTTP Application Routing
+    frontend http_front
+        mode http
+        bind *:80
+        default_backend http_back
+    backend http_back
+        mode http
+        server web_srv web-server-svc:80
+
+---
+# 2. The VNF Deployment (HAProxy Gateway)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mec-gateway-vnf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mec-gateway
+  template:
+    metadata:
+      labels:
+        app: mec-gateway
+    spec:
+      containers:
+      - name: haproxy
+        image: haproxy:alpine
+        volumeMounts:
+        - name: config-volume
+          mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          subPath: haproxy.cfg
+        resources:
+          # Extremely lightweight (<50MB RAM) for Edge compliance
+          limits:
+            memory: "100Mi"
+            cpu: "250m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: haproxy-config
+
+---
+# 3. Service to Expose the Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: mec-gateway-svc
+spec:
+  selector:
+    app: mec-gateway
+  ports:
+    - name: tcp-iperf
+      protocol: TCP
+      port: 5201
+      targetPort: 5201
+    - name: http-web
+      protocol: TCP
+      port: 80
+      targetPort: 80
+
+---
+# 4. Target Server 1: iperf3 (Throughput)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iperf-server
+spec:
+  selector:
+    matchLabels:
+      app: iperf-server
+  template:
+    metadata:
+      labels:
+        app: iperf-server
+    spec:
+      containers:
+      - name: iperf3
+        image: networkstatic/iperf3:latest
+        args: ["-s"]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf-server-svc
+spec:
+  selector:
+    app: iperf-server
+  ports:
+    - protocol: TCP
+      port: 5201
+
+---
+# 5. Target Server 2: NGINX (HTTP Latency)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-server
+spec:
+  selector:
+    matchLabels:
+      app: web-server
+  template:
+    metadata:
+      labels:
+        app: web-server
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-server-svc
+spec:
+  selector:
+    app: web-server
+  ports:
+    - protocol: TCP
+      port: 80
