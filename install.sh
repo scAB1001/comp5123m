@@ -57,6 +57,20 @@ get_latest_github_release() {
     curl -s "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/'
 }
 
+check_endpoint() {
+    # Usage: check_endpoint "Service Name" "URL"
+    local name="$1"
+    local url="$2"
+    log_info "Testing $name endpoint ($url)..."
+
+    # Use -s (silent), -I (headers only), and grep to safely check without triggering set -e
+    if curl -s -I "$url" | grep -q "HTTP"; then
+        log_success "$name is reachable and responding!"
+    else
+        log_error "$name failed to respond. Check service status."
+    fi
+}
+
 # --- Interactive Menu ---
 show_menu() {
     clear
@@ -64,8 +78,12 @@ show_menu() {
     echo -e "-------------------------------------------------------------------------------------"
     echo -e "${BOLD}🛠️  Service Installation${NC}"
     echo -e "  01) $(opt "node")        Install Node Exporter    02) $(opt "prom")        Install Prometheus"
-    echo -e "  03) $(opt "grafana")     Install Grafana LTS      04) $(opt "view")        View all Written Files"
-    echo -e "  05) $(opt "all")         Install Full Stack       06) $(opt "nuke")        Nuke files and Restart"
+    echo -e "  03) $(opt "grafana")     Install Grafana LTS      04) $(opt "stress")      Install/Run stress-ng"
+    echo -e "  05) $(opt "all")         Install Full Stack       06) $(opt "up")          Start All Services"
+    echo -e "-------------------------------------------------------------------------------------"
+    echo -e "${BOLD}🔍  Utilities${NC}"
+    echo -e "  07) $(opt "test")        Test Local Endpoints     08) $(opt "view")        View Written Files"
+    echo -e "  09) $(opt "down")        Stop All Services        10) $(opt "nuke")        Nuke files and Restart"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
 
@@ -76,10 +94,13 @@ show_menu() {
         1|node)      run_script "node" ;;
         2|prom)      run_script "prom" ;;
         3|grafana)   run_script "grafana" ;;
-        4|view)      run_script "view" ;;
+        4|stress)    run_script "stress" ;;
         5|all)       run_script "all" ;;
-        6|nuke)      run_script "nuke" ;;
+        6|up)        run_script "up" ;;
         7|test)      run_script "test" ;;
+        8|view)      run_script "view" ;;
+        9|down)      run_script "down" ;;
+        10|nuke)     run_script "nuke" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
         *)           log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -127,35 +148,34 @@ EOF
             reload_systemd
             assert_cmd "Node Exporter enabled." "Failed to enable service." sudo systemctl enable node_exporter
             assert_cmd "Node Exporter started." "Failed to start service." sudo systemctl restart node_exporter
+
+            # Post-Install Verification
+            sleep 2 # Give it a moment to bind to the port
+            check_endpoint "Node Exporter" "http://localhost:9100"
             ;;
 
-            "prom")
+        "prom")
             header "PROMETHEUS SETUP"
             log_info "Fetching latest Prometheus version..."
             PROM_VERSION=$(get_latest_github_release "prometheus/prometheus")
             log_data "Latest Version: $PROM_VERSION"
 
             log_info "Downloading and extracting archive..."
-            # Clean up any failed previous downloads to prevent .tar.gz.1 duplicates
             rm -f prometheus-*.tar.gz*
             assert_cmd "Download complete." "Failed to download." wget -q https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz
             tar -xf prometheus-${PROM_VERSION}.linux-amd64.tar.gz
 
-            # Clean up the archive immediately after extraction
             rm -f prometheus-${PROM_VERSION}.linux-amd64.tar.gz
 
             log_info "Installing binaries and configuration directories..."
             sudo mv prometheus-${PROM_VERSION}.linux-amd64/prometheus prometheus-${PROM_VERSION}.linux-amd64/promtool /usr/local/bin
             sudo mkdir -p /etc/prometheus /var/lib/prometheus
 
-            # Clean up extracted folder (consoles and console_libraries are no longer bundled in v3.0+)
             log_info "Removing residual files..."
             rm -r prometheus-${PROM_VERSION}.linux-amd64*
 
             log_info "Opening /etc/hosts file to add machine IPs..."
-            # Add the following, replace x.x.x.x with the machine’s corresponding IP address
-
-            log_info "Copy and paste these lines:"
+            log_info "Copy and paste these lines if required:"
             log_data "20.90.75.243 prometheus-target-1"
             log_data "20.90.75.243 prometheus-target-2"
             sleep 2
@@ -181,7 +201,6 @@ EOF
             sudo chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus
 
             log_info "Writing systemd service file..."
-            # The --web.console flags have been removed to ensure v3.0+ compatibility
             sudo tee /etc/systemd/system/prometheus.service > /dev/null <<EOF
 [Unit]
 Description=Prometheus
@@ -205,6 +224,10 @@ EOF
             assert_cmd "Prometheus started." "Failed to start service." sudo systemctl restart prometheus
 
             log_warn "Remember to add targets to /etc/hosts if resolving via hostnames!"
+
+            # Post-Install Verification
+            sleep 2
+            check_endpoint "Prometheus" "http://localhost:9090"
             ;;
 
         "grafana")
@@ -224,6 +247,56 @@ EOF
             reload_systemd
             assert_cmd "Grafana enabled." "Failed to enable service." sudo systemctl enable grafana-server
             assert_cmd "Grafana started." "Failed to start service." sudo systemctl restart grafana-server
+
+            # Post-Install Verification
+            sleep 2
+            check_endpoint "Grafana" "http://localhost:3000"
+            ;;
+
+        "stress")
+            header "STRESS-NG SETUP & EXECUTION"
+            log_info "Updating package lists..."
+            assert_cmd "Apt updated." "Failed to update apt." sudo apt-get update -qq
+
+            log_info "Installing stress-ng..."
+            assert_cmd "stress-ng installed." "Failed to install stress-ng." sudo apt-get install -y -qq stress-ng
+
+            if ask_yes_no "Run a 1-minute benchmark now? (4 CPU, 2 VM, 1 HDD, 8 Fork)"; then
+                log_warn "Commencing stress test for 1 minute. Check your Grafana dashboards for spikes!"
+                # We temporarily suspend set -e just in case stress-ng throws a non-zero exit code due to deliberate hardware thrashing
+                stress-ng --cpu 4 --vm 2 --hdd 1 --fork 8 --timeout 1m --metrics || true
+                log_success "Stress test completed."
+            else
+                log_info "You can run tests later manually (e.g., 'stress-ng --cpu 4 --timeout 1m')."
+            fi
+            ;;
+
+        "up")
+            header "STARTING ALL SERVICES"
+            log_info "Starting services..."
+            assert_cmd "Node Exporter enabled." "Failed to enable service." sudo systemctl enable node_exporter
+            assert_cmd "Node Exporter started." "Failed to start service." sudo systemctl restart node_exporter
+
+            assert_cmd "Prometheus enabled." "Failed to enable service." sudo systemctl enable prometheus
+            assert_cmd "Prometheus started." "Failed to start service." sudo systemctl restart prometheus
+
+            assert_cmd "Grafana enabled." "Failed to enable service." sudo systemctl enable grafana-server
+            assert_cmd "Grafana started." "Failed to start service." sudo systemctl restart grafana-server
+            log_success "Services started successfully."
+            ;;
+
+        "down")
+            header "STOPPING ALL SERVICES"
+            log_info "Stopping services to reduce compute overhead..."
+
+            sudo systemctl stop prometheus 2>/dev/null || true
+            log_success "Prometheus stopped."
+
+            sudo systemctl stop node_exporter 2>/dev/null || true
+            log_success "Node Exporter stopped."
+
+            sudo systemctl stop grafana-server 2>/dev/null || true
+            log_success "Grafana stopped."
             ;;
 
         "view")
@@ -256,13 +329,11 @@ EOF
 
             if ask_yes_no "Are you sure you want to nuke the stack?"; then
                 log_info "Stopping services (if running)..."
-                # The '2>/dev/null || true' swallows errors if the service doesn't exist/isn't loaded
                 sudo systemctl stop prometheus 2>/dev/null || true
                 sudo systemctl stop node_exporter 2>/dev/null || true
                 sudo systemctl stop grafana-server 2>/dev/null || true
 
                 log_info "Removing binaries..."
-                # Added -f to ignore non-existent files without throwing errors
                 sudo rm -f /usr/local/bin/prometheus /usr/local/bin/promtool /usr/local/bin/node_exporter
 
                 log_info "Removing configuration and data directories..."
@@ -278,9 +349,7 @@ EOF
                 log_info "Removing Grafana data and log directories..."
                 sudo rm -rf /etc/grafana /var/lib/grafana /var/log/grafana
 
-                # Call your existing systemd reload function
                 reload_systemd
-
                 log_success "Stack completely removed."
             else
                 log_info "Nuke operation aborted."
@@ -289,23 +358,19 @@ EOF
 
         "test")
             header "TESTING ENDPOINTS"
-            # Current IP
-            curl ifconfig.me
-            echo
 
-            # Prove Prometheus is Working Locally
-            curl -I http://localhost:9090
+            log_info "Retrieving Public IP..."
+            local ip=$(curl -s ifconfig.me)
+            log_data "Public IP: $ip"
+            echo ""
 
-            # Prove Grafana is Working Locally
-            curl -I http://localhost:3000
+            # Check local internal reachability
+            check_endpoint "Node Exporter" "http://localhost:9100"
+            check_endpoint "Prometheus"    "http://localhost:9090"
+            check_endpoint "Grafana"       "http://localhost:3000"
+            echo ""
 
-            # nLpY9FM%8t'V~^2
-
-            # You must explicitly allow external traffic to reach that specific port.
-            # Go to the Microsoft Azure Portal.
-            # Ubuntu Virtual Machine (vm-ab) > Networking > Add inbound port rule.
-            # Set Destination port ranges to 9090, Protocol to TCP, and Action to Allow.
-            # (Repeat this process for port 3000 so Grafana works later).
+            log_warn "Reminder: Ensure you have added inbound rules for TCP 9090 and 3000 in your Azure NSG to access via $ip."
             ;;
 
         *)

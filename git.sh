@@ -8,4 +8,4 @@ git add .; git commit
 
 git push origin cwk2
 
-cd cwk2
+cd comp5123m

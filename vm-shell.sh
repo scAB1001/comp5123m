@@ -10,4 +10,8 @@ ssh -i ~/github-projects/uni/comp5123m/vm-ab_key.pem azureuser@20.90.75.243
 firefox http://20.90.75.243:9090/query
 
 # pass for grafana
-nLpY9FM%8t'V~^2
+# nLpY9FM%8t'V~^2
+
+# user, pass and PAT for docker registry
+# scab1001
+# $:tyjcVSFL8>~hF
