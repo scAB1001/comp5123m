@@ -7,5 +7,3 @@ git pull origin cwk2; git st
 git add .; git commit
 
 git push origin cwk2
-
-cd comp5123m
