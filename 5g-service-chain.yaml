@@ -1,0 +1,185 @@
+---
+# ---------------------------------------------------
+# VNF 1: Edge Security Firewall (NGINX)
+# ---------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: firewall-config
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    # Layer 4 (TCP) firewall rule for iperf3
+    stream {
+        server {
+            listen 5201;
+            proxy_pass mec-gateway-svc:5201;
+        }
+    }
+    # Layer 7 (HTTP) firewall rule for web traffic
+    http {
+        server {
+            listen 80;
+            location / {
+                proxy_pass http://mec-gateway-svc:80;
+            }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-firewall-vnf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge-firewall
+  template:
+    metadata:
+      labels:
+        app: edge-firewall
+    spec:
+      containers:
+      - name: nginx-firewall
+        image: nginx:alpine
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        resources:
+          limits: { memory: "100Mi", cpu: "200m" }
+      volumes:
+      - name: config-volume
+        configMap:
+          name: firewall-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-firewall-svc
+spec:
+  selector:
+    app: edge-firewall
+  ports:
+    - name: tcp-iperf
+      port: 5201
+    - name: http-web
+      port: 80
+
+---
+# ---------------------------------------------------
+# VNF 2: MEC UPF Gateway (HAProxy)
+# ---------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+data:
+  haproxy.cfg: |
+    global
+        maxconn 1024
+    defaults
+        timeout connect 5000ms
+        timeout client  50000ms
+        timeout server  50000ms
+    frontend iperf_front
+        mode tcp
+        bind *:5201
+        default_backend iperf_back
+    backend iperf_back
+        mode tcp
+        server iperf_srv iperf-server-svc:5201
+    frontend http_front
+        mode http
+        bind *:80
+        default_backend http_back
+    backend http_back
+        mode http
+        server web_srv web-server-svc:80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mec-gateway-vnf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mec-gateway
+  template:
+    metadata:
+      labels:
+        app: mec-gateway
+    spec:
+      containers:
+      - name: haproxy
+        image: haproxy:alpine
+        volumeMounts:
+        - name: config-volume
+          mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          subPath: haproxy.cfg
+        resources:
+          limits: { memory: "100Mi", cpu: "200m" }
+      volumes:
+      - name: config-volume
+        configMap:
+          name: haproxy-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mec-gateway-svc
+spec:
+  selector:
+    app: mec-gateway
+  ports:
+    - name: tcp-iperf
+      port: 5201
+    - name: http-web
+      port: 80
+
+---
+# ---------------------------------------------------
+# Backend Target Servers (iperf3 & web)
+# ---------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: target-servers
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: target-servers
+  template:
+    metadata:
+      labels:
+        app: target-servers
+    spec:
+      containers:
+      - name: iperf3
+        image: networkstatic/iperf3:latest
+        args: ["-s"]
+      - name: nginx-web
+        image: nginx:alpine
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf-server-svc
+spec:
+  selector:
+    app: target-servers
+  ports:
+    - port: 5201
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-server-svc
+spec:
+  selector:
+    app: target-servers
+  ports:
+    - port: 80

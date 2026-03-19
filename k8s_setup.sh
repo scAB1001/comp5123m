@@ -191,6 +191,7 @@ exec_cmd() {
 
             log_info "Applying VNF Manifests (HAProxy Gateway + Backends)..."
             assert_cmd "Manifests applied." "Apply failed." kubectl apply -f mec-gateway.yaml
+            assert_cmd "Manifests applied." "Apply failed." kubectl apply -f 5g-service-chain.yaml
 
             wait_for_pods
 
@@ -232,10 +233,12 @@ exec_cmd() {
             fi
             echo ""
 
+            # TODO: Separate tests.
             log_info "TEST 2: iperf3 (TCP Throughput via VNF)"
             log_data "This floods the VNF with TCP packets to find the maximum bandwidth ceiling."
             if ask_yes_no "Run iperf3 test for 20 seconds?"; then
                 kubectl run -i --tty --rm iperf-client --image=networkstatic/iperf3 --restart=Never -- -c mec-gateway-svc -t 20
+                kubectl run -i --tty --rm iperf-client --image=networkstatic/iperf3 --restart=Never -- -c edge-firewall-svc -t 20
                 log_success "iperf3 test complete. Record the Bitrate (e.g. Mbits/sec) for your report."
             fi
             echo ""
@@ -244,6 +247,7 @@ exec_cmd() {
             log_data "Simulates 100 concurrent 5G users hammering the VNF Gateway with requests."
             if ask_yes_no "Run wrk HTTP test for 30 seconds?"; then
                 kubectl run -i --tty --rm wrk-client --image=ruslanys/wrk --restart=Never -- -c 100 -t 4 -d 30s http://mec-gateway-svc:80
+                kubectl run -i --tty --rm wrk-client --image=ruslanys/wrk --restart=Never -- -c 100 -t 4 -d 30s http://edge-firewall-svc:80
                 log_success "wrk test complete. Record the Requests/sec and Latency for your report."
             fi
             ;;

@@ -71,6 +71,13 @@ check_endpoint() {
     fi
 }
 
+update_packages() {
+    sudo apt update
+    sudo apt list --upgradable
+    sleep 2
+    sudo apt upgrade -y
+}
+
 # --- Interactive Menu ---
 show_menu() {
     clear
@@ -82,7 +89,7 @@ show_menu() {
     echo -e "  05) $(opt "all")         Install Full Stack       06) $(opt "up")          Start All Services"
     echo -e "-------------------------------------------------------------------------------------"
     echo -e "${BOLD}🔍  Utilities${NC}"
-    echo -e "  07) $(opt "test")        Test Local Endpoints     08) $(opt "view")        View Written Files"
+    echo -e "  07) $(opt "test")        Test Local Endpoints     08) $(opt "update")      Update Pacakges"
     echo -e "  09) $(opt "down")        Stop All Services        10) $(opt "nuke")        Nuke files and Restart"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
@@ -98,7 +105,7 @@ show_menu() {
         5|all)       run_script "all" ;;
         6|up)        run_script "up" ;;
         7|test)      run_script "test" ;;
-        8|view)      run_script "view" ;;
+        8|update)    run_script "update" ;;
         9|down)      run_script "down" ;;
         10|nuke)     run_script "nuke" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
@@ -282,6 +289,9 @@ EOF
 
             assert_cmd "Grafana enabled." "Failed to enable service." sudo systemctl enable grafana-server
             assert_cmd "Grafana started." "Failed to start service." sudo systemctl restart grafana-server
+
+            exec_cmd "view"
+
             log_success "Services started successfully."
             ;;
 
@@ -323,6 +333,10 @@ EOF
             log_data "Grafana Web UI:    http://localhost:3000 (Default: admin / admin)"
             ;;
 
+        "update")
+            header "UPDATE PACKAGES"
+            update_packages
+            ;;
         "nuke")
             header "PURGING SERVICES & DATA"
             log_warn "This will completely remove Prometheus, Node Exporter, and Grafana."
