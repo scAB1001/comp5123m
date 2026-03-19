@@ -94,23 +94,22 @@ update_packages() {
 # --- Interactive Menu ---
 show_menu() {
     clear
-    echo -e "${CYAN}${BOLD}⚡  CW2: EDGE CLIENT ORCHESTRATION (VM-EDGE)${NC}"
+    echo -e "${CYAN}${BOLD}⚡   CW2: EDGE CLIENT ORCHESTRATION (VM-EDGE)${NC}"
     echo -e "-------------------------------------------------------------------------------------"
-    echo -e "${BOLD}📦 Task B: Infrastructure Provisioning${NC}"
-    echo -e "  01) $(opt "node")        Install Node Exporter (Hardware Scraper)"
-    echo -e "  02) $(opt "k3s")         Install K3s Engine (Lightweight K8s)"
-    echo -e "  03) $(opt "stress")      Install stress-ng (Workload Generator)"
-    echo -e "  04) $(opt "all-base")    Install All Base Tools"
+    echo -e "${BOLD}📦  Task B: Infrastructure Provisioning${NC}"
+    echo -e "  01) $(opt "k3s")         Install K3s Engine (Lightweight K8s)"
+    echo -e "  02) $(opt "all-base")    Install Base Tools (Node Exporter, stress-ng)"
     echo -e "-------------------------------------------------------------------------------------"
-    echo -e "${BOLD}🚀 Task C & D: Edge Deployment & Experimental Testing${NC}"
-    echo -e "  05) $(opt "deploy")      Deploy 5G Service Chain & Run 'Hello World'"
-    echo -e "  06) $(opt "test")        Run Experimental Load Tests (iperf3, wrk, ping)"
+    echo -e "${BOLD}🚀  Task C & D: Edge Deployment & Experimental Testing${NC}"
+    echo -e "  03) $(opt "deploy")      Deploy 5G Service Chain & Run 'Hello World'"
+    echo -e "  04) $(opt "test")        Run Experimental Load Tests (iperf3, wrk, ping)"
     echo -e "-------------------------------------------------------------------------------------"
     echo -e "${BOLD}⚙️  Lifecycle & Utilities${NC}"
-    echo -e "  07) $(opt "stats")       View VM Specs & Internal IP (For Prometheus)"
+    echo -e "  05) $(opt "up")          Start All Edge Services (K3s & Base)"
+    echo -e "  06) $(opt "down")        Stop All Services (Idle VM)"
+    echo -e "  07) $(opt "stats")       View VM Specs & Service Health"
     echo -e "  08) $(opt "update")      Update OS Packages"
-    echo -e "  09) $(opt "down")        Stop Services (Idle VM)"
-    echo -e "  10) $(opt "nuke")        Uninstall K3s & Purge Node Exporter"
+    echo -e "  09) $(opt "nuke")        Uninstall K3s & Purge Node Exporter"
 
     echo -ne "\n   q) ${NC}[${RED}Quit${NC}]        ${YELLOW}Select an option: ${NC}"
 
@@ -118,16 +117,15 @@ show_menu() {
     user_opt=$(echo "$user_opt" | tr '[:upper:]' '[:lower:]')
 
     case $user_opt in
-        1|node)      run_script "node" ;;
-        2|k3s)       run_script "k3s" ;;
-        3|stress)    run_script "stress" ;;
-        4|all-base)  run_script "all-base" ;;
-        5|deploy)    run_script "deploy" ;;
-        6|test)      run_script "test" ;;
+        1|k3s)       run_script "k3s" ;;
+        2|all-base)  run_script "all-base" ;;
+        3|deploy)    run_script "deploy" ;;
+        4|test)      run_script "test" ;;
+        5|up)        run_script "up" ;;
+        6|down)      run_script "down" ;;
         7|stats)     run_script "stats" ;;
         8|update)    run_script "update" ;;
-        9|down)      run_script "down" ;;
-        10|nuke)     run_script "nuke" ;;
+        9|nuke)      run_script "nuke" ;;
         q|quit|exit) log_success "Exiting..."; exit 0 ;;
         *)           log_error "Invalid option"; sleep 1; show_menu ;;
     esac
@@ -196,7 +194,6 @@ EOF
         "all-base")
             header "INSTALLING ALL BASE EDGE TOOLS"
             exec_cmd "node"
-            exec_cmd "k3s"
             exec_cmd "stress"
             log_success "All Edge infrastructure successfully provisioned."
             ;;
@@ -264,6 +261,25 @@ EOF
         # ==========================================================
         # UTILITIES
         # ==========================================================
+        "up")
+            header "STARTING EDGE ENVIRONMENT"
+            log_info "Starting K3s Orchestrator..."
+            assert_cmd "K3s is running." "Failed to start K3s." sudo systemctl start k3s
+
+            log_info "Starting Hardware Scraper (Node Exporter)..."
+            assert_cmd "Node Exporter is running." "Failed to start Node Exporter." sudo systemctl start node_exporter
+
+            log_success "Edge Environment is fully active."
+            ;;
+
+        "down")
+            header "STOPPING EDGE SERVICES"
+            log_info "Stopping services to reduce compute overhead..."
+            sudo systemctl stop k3s 2>/dev/null || true
+            sudo systemctl stop node_exporter 2>/dev/null || true
+            log_success "K3s and Node Exporter stopped. VM is idling."
+            ;;
+
         "stats")
             header "EDGE SYSTEM SPECIFICATIONS (TASK B SUMMARY)"
             local internal_ip=$(hostname -I | awk '{print $1}')
@@ -294,14 +310,6 @@ EOF
             header "UPDATE OS PACKAGES"
             update_packages
             log_success "OS Packages Updated."
-            ;;
-
-        "down")
-            header "STOPPING EDGE SERVICES"
-            log_info "Stopping services to reduce compute overhead..."
-            sudo systemctl stop k3s 2>/dev/null || true
-            sudo systemctl stop node_exporter 2>/dev/null || true
-            log_success "K3s and Node Exporter stopped. VM is idling."
             ;;
 
         "nuke")

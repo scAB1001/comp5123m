@@ -97,7 +97,7 @@ update_packages() {
 # --- Interactive Menu ---
 show_menu() {
     clear
-    echo -e "${CYAN}${BOLD}☁️   CW2: CLOUD SERVER ORCHESTRATION (VM-AB)${NC}"
+    echo -e "${CYAN}${BOLD}☁️   CW2: CLOUD SERVER ORCHESTRATION (VM-CLOUD)${NC}"
     echo -e "-------------------------------------------------------------------------------------"
     echo -e "${BOLD}📦  Task B: Infrastructure Provisioning${NC}"
     echo -e "  01) $(opt "k8s")         Install K8s Stack (Docker, Kubectl, Minikube)"
@@ -109,7 +109,7 @@ show_menu() {
     echo -e "-------------------------------------------------------------------------------------"
     echo -e "${BOLD}⚙️  Lifecycle & Utilities${NC}"
     echo -e "  05) $(opt "up")          Start All Cloud Services (Minikube & Monitoring)"
-    echo -e "  06) $(opt "down")        Stop All Services (Reduce compute usage)"
+    echo -e "  06) $(opt "down")        Stop All Services (Idle VM)"
     echo -e "  07) $(opt "stats")       View VM Specs & Service Health"
     echo -e "  08) $(opt "update")      Update OS Packages"
     echo -e "  09) $(opt "nuke")        Purge Monitoring Stack (Prometheus, Grafana, Node)"

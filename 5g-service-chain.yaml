@@ -1,7 +1,7 @@
 ---
-# ---------------------------------------------------
+# ===================================================
 # VNF 1: Edge Security Firewall (NGINX)
-# ---------------------------------------------------
+# ===================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,20 +9,13 @@ metadata:
 data:
   nginx.conf: |
     events { worker_connections 1024; }
-    # Layer 4 (TCP) firewall rule for iperf3
     stream {
-        server {
-            listen 5201;
-            proxy_pass mec-gateway-svc:5201;
-        }
+        server { listen 5201; proxy_pass dpi-inspector-svc:5201; }
     }
-    # Layer 7 (HTTP) firewall rule for web traffic
     http {
         server {
             listen 80;
-            location / {
-                proxy_pass http://mec-gateway-svc:80;
-            }
+            location / { proxy_pass http://dpi-inspector-svc:80; }
         }
     }
 ---
@@ -32,13 +25,9 @@ metadata:
   name: edge-firewall-vnf
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: edge-firewall
+  selector: { matchLabels: { app: edge-firewall } }
   template:
-    metadata:
-      labels:
-        app: edge-firewall
+    metadata: { labels: { app: edge-firewall } }
     spec:
       containers:
       - name: nginx-firewall
@@ -51,16 +40,14 @@ spec:
           limits: { memory: "100Mi", cpu: "200m" }
       volumes:
       - name: config-volume
-        configMap:
-          name: firewall-config
+        configMap: { name: firewall-config }
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: edge-firewall-svc
 spec:
-  selector:
-    app: edge-firewall
+  selector: { app: edge-firewall }
   ports:
     - name: tcp-iperf
       port: 5201
@@ -68,9 +55,67 @@ spec:
       port: 80
 
 ---
-# ---------------------------------------------------
-# VNF 2: MEC UPF Gateway (HAProxy)
-# ---------------------------------------------------
+# ===================================================
+# VNF 2: DPI / IDS Emulator (NGINX) [NEW]
+# ===================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dpi-config
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    stream {
+        server { listen 5201; proxy_pass mec-gateway-svc:5201; }
+    }
+    http {
+        server {
+            listen 80;
+            # Emulating Layer 7 Deep Packet Inspection & Header Modification
+            add_header X-DPI-Inspected "True-Secure";
+            location / { proxy_pass http://mec-gateway-svc:80; }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dpi-inspector-vnf
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: dpi-inspector } }
+  template:
+    metadata: { labels: { app: dpi-inspector } }
+    spec:
+      containers:
+      - name: nginx-dpi
+        image: nginx:alpine
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        resources:
+          limits: { memory: "100Mi", cpu: "250m" }
+      volumes:
+      - name: config-volume
+        configMap: { name: dpi-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dpi-inspector-svc
+spec:
+  selector: { app: dpi-inspector }
+  ports:
+    - name: tcp-iperf
+      port: 5201
+    - name: http-web
+      port: 80
+
+---
+# ===================================================
+# VNF 3: MEC UPF Gateway (HAProxy)
+# ===================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -104,13 +149,9 @@ metadata:
   name: mec-gateway-vnf
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: mec-gateway
+  selector: { matchLabels: { app: mec-gateway } }
   template:
-    metadata:
-      labels:
-        app: mec-gateway
+    metadata: { labels: { app: mec-gateway } }
     spec:
       containers:
       - name: haproxy
@@ -123,16 +164,14 @@ spec:
           limits: { memory: "100Mi", cpu: "200m" }
       volumes:
       - name: config-volume
-        configMap:
-          name: haproxy-config
+        configMap: { name: haproxy-config }
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mec-gateway-svc
 spec:
-  selector:
-    app: mec-gateway
+  selector: { app: mec-gateway }
   ports:
     - name: tcp-iperf
       port: 5201
@@ -140,22 +179,18 @@ spec:
       port: 80
 
 ---
-# ---------------------------------------------------
+# ===================================================
 # Backend Target Servers (iperf3 & web)
-# ---------------------------------------------------
+# ===================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: target-servers
 spec:
   replicas: 1
-  selector:
-    matchLabels:
-      app: target-servers
+  selector: { matchLabels: { app: target-servers } }
   template:
-    metadata:
-      labels:
-        app: target-servers
+    metadata: { labels: { app: target-servers } }
     spec:
       containers:
       - name: iperf3
@@ -169,8 +204,7 @@ kind: Service
 metadata:
   name: iperf-server-svc
 spec:
-  selector:
-    app: target-servers
+  selector: { app: target-servers }
   ports:
     - port: 5201
 ---
@@ -179,7 +213,6 @@ kind: Service
 metadata:
   name: web-server-svc
 spec:
-  selector:
-    app: target-servers
+  selector: { app: target-servers }
   ports:
     - port: 80
