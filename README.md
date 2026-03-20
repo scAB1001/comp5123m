@@ -1,9 +1,10 @@
-# comp5123m
+# COMP5123M
 
 ## 2 VNFs
 
 ### Server
 
+```bash
 =========== TASK D: EXPERIMENTAL LOAD TESTING (CLOUD) ===========
  i Ensure you have your Grafana dashboard open to watch the Cloud VM metrics.
 
@@ -58,7 +59,6 @@ iperf Done.
 pod "iperf-client" deleted from default namespace
  ✓ iperf3 test complete. Record the Cloud Bitrate (Mbits/sec).
 
-
  i TEST 3: wrk (HTTP API Load Simulation)
    > Simulates 100 concurrent 5G users hammering the VNF Gateway with requests.
  ? Run wrk HTTP test for 30 seconds? (y/N): y
@@ -74,8 +74,11 @@ Transfer/sec:    720.03KB
 pod "wrk-client" deleted from default namespace
  ✓ wrk test complete. Record the Cloud Requests/sec and Latency.
 
+```
+
 ### Client
 
+```bash
 =========== TASK D: EXPERIMENTAL LOAD TESTING (EDGE) ===========
  i Ensure you are watching the Edge VM metrics on your Cloud Grafana dashboard.
 
@@ -145,6 +148,8 @@ Transfer/sec:      1.18MB
 pod "wrk-client" deleted from default namespace
  ✓ wrk test complete. Record the Edge Requests/sec and Latency.
 
+```
+
 ### Notes
 
 #### (a) Reduce scrape intervals & minimal dashboards
@@ -176,6 +181,7 @@ pod "wrk-client" deleted from default namespace
 
 ### Server
 
+```bash
 =========== TASK D: EXPERIMENTAL LOAD TESTING (CLOUD) ===========
  i Ensure you have your Grafana dashboard open to watch the Cloud VM metrics.
 
@@ -245,9 +251,11 @@ Transfer/sec:    788.69KB
 pod "wrk-client" deleted from default namespace
  ✓ wrk test complete. Record the Cloud Requests/sec and Latency.
 
+```
 
 ### Client
 
+```bash
 =========== TASK D: EXPERIMENTAL LOAD TESTING (EDGE) ===========
  i Ensure you are watching the Edge VM metrics on your Cloud Grafana dashboard.
 
@@ -317,15 +325,11 @@ Transfer/sec:      1.19MB
 pod "wrk-client" deleted from default namespace
  ✓ wrk test complete. Record the Edge Requests/sec and Latency.
 
- ### Results
+```
 
- This data is absolutely brilliant. You have just successfully generated the final piece of evidence for a high-distinction coursework report.
-
-Let's break down exactly what we are observing here, how it compares to the 2-VNF setup, and how you will frame this in your Task E Discussion.
+### Results
 
 #### The Grand Data Comparison (2-VNF vs. 3-VNF)
-
-Here is a consolidated table of all your experimental results:
 
 | Metric | Environment | 2 VNFs | 3 VNFs (Added DPI Node) | Impact of +1 VNF |
 | :--- | :--- | :--- | :--- | :--- |
@@ -344,15 +348,11 @@ Why didn't the 3rd VNF break the Edge node like we hypothesized?
 
 Because of **Container Runtime Efficiency and CPU Throttling**.
 
-Here is the conclusion you must draw in your report:
-
 1. **The Edge Wins on Network Pathing:** The Edge VM (using K3s and Containerd) routes internal cluster traffic far more efficiently than the Cloud VM (using Minikube and Docker). Because the 3 VNFs are all sitting on the exact same physical node, jumping from `Firewall -> DPI -> Gateway` happens entirely in the host's kernel memory (via `iptables`/IPVS). Adding a 3rd hop in K3s takes microseconds. The Cloud VM loses because every hop has to fight through the heavy Docker bridge network overlay.
 2. **The CPU "Ceiling" Wasn't Reached:** Our 3-VNF chain is extremely well-optimized. NGINX (Firewall/DPI) and HAProxy (Gateway) are highly efficient C-based binaries. Even with 100 concurrent users hammering the system, they didn't consume enough raw CPU to throttle the Edge VM. You proved that *lightweight* 5G VNFs can run flawlessly on Edge hardware.
 3. **The Single Bottleneck Identified:** The only metric that degraded was the Cloud VM's raw TCP throughput (`iperf3` dropped from 1.13 Gbps to 956 Mbps). This proves that the Docker networking layer on the Cloud VM is extremely sensitive to deep Service Function Chaining. The more hops you add inside Minikube, the more bandwidth you lose. The Edge K3s node suffered zero bandwidth loss.
 
 #### Structuring Your Task E Discussion
-
-You have everything you need. Here is the outline you should use to write your report, supported directly by the data you generated:
 
 **1. Experimental Setup:**
 * Define the 3-VNF Service Chain (Firewall -> DPI Emulator -> MEC Gateway).

@@ -67,7 +67,7 @@ check_endpoint() {
     local name="$1"
     local url="$2"
     local max_attempts=5
-    local wait_time=3
+    local wait_time=5
 
     log_info "Testing $name endpoint ($url)..."
 
