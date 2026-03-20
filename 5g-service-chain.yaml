@@ -1,12 +1,21 @@
 ---
-# ===================================================
-# VNF 1: Edge Security Firewall (NGINX)
-# ===================================================
+# ==============================================================================
+# 5G SERVICE FUNCTION CHAIN (SFC) MANIFEST
+# Architecture: ETSI MANO via Kubernetes (K3s/Minikube Orchestrator)
+# Scenario: Zero-Trust Slicing as a Service (SlaaS) for Edge Computing
+# Topology: VNF 1 (Firewall) -> VNF 2 (DPI Inspector) -> VNF 3 (UPF Gateway) -> Target
+# ==============================================================================
+
+# ==============================================================================
+# VNF 1: EDGE SECURITY FIREWALL (NGINX)
+# Role: Admission Control and initial ingress filtering at the network boundary.
+# ==============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: firewall-config
 data:
+  # Intent-Based configuration: Routes L4 (TCP) and L7 (HTTP) traffic to VNF 2
   nginx.conf: |
     events { worker_connections 1024; }
     stream {
@@ -31,12 +40,14 @@ spec:
     spec:
       containers:
       - name: nginx-firewall
-        image: nginx:alpine
+        image: nginx:alpine # Lightweight microservice for Edge consolidation
         volumeMounts:
         - name: config-volume
           mountPath: /etc/nginx/nginx.conf
           subPath: nginx.conf
+        # Strict capacity allocation to prevent Edge node resource exhaustion
         resources:
+          requests: { memory: "100Mi", cpu: "200m" }
           limits: { memory: "100Mi", cpu: "200m" }
       volumes:
       - name: config-volume
@@ -47,6 +58,7 @@ kind: Service
 metadata:
   name: edge-firewall-svc
 spec:
+  # Internal load balancer managed by kube-proxy (iptables)
   selector: { app: edge-firewall }
   ports:
     - name: tcp-iperf
@@ -55,9 +67,11 @@ spec:
       port: 80
 
 ---
-# ===================================================
-# VNF 2: DPI / IDS Emulator (NGINX) [NEW]
-# ===================================================
+# ==============================================================================
+# VNF 2: DEEP PACKET INSPECTION (DPI) / IDS EMULATOR (NGINX)
+# Role: Lawful Interception & active Layer 7 header manipulation.
+# Serves as the primary computational stressor for the Edge node.
+# ==============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -71,7 +85,7 @@ data:
     http {
         server {
             listen 80;
-            # Emulating Layer 7 Deep Packet Inspection & Header Modification
+            # Emulating L7 DPI: Actively modifies payload headers before forwarding
             add_header X-DPI-Inspected "True-Secure";
             location / { proxy_pass http://mec-gateway-svc:80; }
         }
@@ -95,6 +109,8 @@ spec:
           mountPath: /etc/nginx/nginx.conf
           subPath: nginx.conf
         resources:
+          # Slightly higher CPU limit due to computational overhead of header injection
+          requests: { memory: "100Mi", cpu: "250m" }
           limits: { memory: "100Mi", cpu: "250m" }
       volumes:
       - name: config-volume
@@ -113,9 +129,11 @@ spec:
       port: 80
 
 ---
-# ===================================================
-# VNF 3: MEC UPF Gateway (HAProxy)
-# ===================================================
+# ==============================================================================
+# VNF 3: MEC UPF GATEWAY (HAProxy)
+# Role: User Plane Function. High-concurrency traffic engineering and
+# final load balancing to the backend target services.
+# ==============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -155,12 +173,13 @@ spec:
     spec:
       containers:
       - name: haproxy
-        image: haproxy:alpine
+        image: haproxy:alpine # Highly efficient C-based routing microservice
         volumeMounts:
         - name: config-volume
           mountPath: /usr/local/etc/haproxy/haproxy.cfg
           subPath: haproxy.cfg
         resources:
+          requests: { memory: "100Mi", cpu: "200m" }
           limits: { memory: "100Mi", cpu: "200m" }
       volumes:
       - name: config-volume
@@ -179,9 +198,10 @@ spec:
       port: 80
 
 ---
-# ===================================================
-# Backend Target Servers (iperf3 & web)
-# ===================================================
+# ==============================================================================
+# TARGET BACKEND SERVICES
+# Role: Sink for telemetry and load testing. Simulates the final edge applications.
+# ==============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -196,8 +216,14 @@ spec:
       - name: iperf3
         image: networkstatic/iperf3:latest
         args: ["-s"]
+        resources:
+          requests: { memory: "50Mi", cpu: "100m" }
+          limits: { memory: "100Mi", cpu: "200m" }
       - name: nginx-web
         image: nginx:alpine
+        resources:
+          requests: { memory: "50Mi", cpu: "100m" }
+          limits: { memory: "100Mi", cpu: "200m" }
 ---
 apiVersion: v1
 kind: Service

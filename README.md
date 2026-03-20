@@ -369,3 +369,181 @@ Because of **Container Runtime Efficiency and CPU Throttling**.
 **4. Literature Contrast (The Final Rubric Requirement):**
 * As noted before, you will need to find 1 or 2 external academic papers to cite here. Search Google Scholar for: *"Performance evaluation of K3s vs Kubernetes at the Edge"*.
 * You will likely find papers that agree with your findings (that K3s has lower latency and higher throughput due to less orchestration overhead). Cite them, and state: *"Our empirical findings align with [Author], demonstrating that stripped-down orchestrators outperform heavy cloud deployments for localised telecom routing."*
+
+
+## 3VNFs - Lenovo
+
+=========== TASK D: EXPERIMENTAL LOAD TESTING (CLOUD) ===========
+ i Ensure you have your Grafana dashboard open to watch the Cloud VM metrics.
+
+ i TEST 1: ICMP Ping (Baseline Cloud Latency)
+   > Pinging the VNF Pod directly (K8s Services drop ICMP traffic by design).
+ ? Run Ping test? (y/N): y
+ i Extracted Cloud Firewall Pod IP: 10.244.0.71
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+64 bytes from 10.244.0.71: seq=1 ttl=64 time=0.077 ms
+64 bytes from 10.244.0.71: seq=2 ttl=64 time=0.074 ms
+64 bytes from 10.244.0.71: seq=3 ttl=64 time=0.079 ms
+64 bytes from 10.244.0.71: seq=4 ttl=64 time=0.079 ms
+
+--- 10.244.0.71 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max = 0.074/0.110/0.242 ms
+pod "ping-client" deleted from default namespace
+ ✓ Ping test complete. Record the Cloud latency (ms) for your report.
+
+ i TEST 2: iperf3 (TCP Throughput via Service Chain)
+   > Floods the VNF with TCP packets to find the maximum bandwidth ceiling.
+ ? Run iperf3 test for 20 seconds? (y/N): y
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.03   sec   186 MBytes  1.52 Gbits/sec    6    621 KBytes
+[  5]   1.03-2.00   sec   156 MBytes  1.35 Gbits/sec    6    621 KBytes
+[  5]   2.00-3.01   sec   176 MBytes  1.46 Gbits/sec   11    621 KBytes
+[  5]   3.01-4.00   sec   164 MBytes  1.39 Gbits/sec    6    621 KBytes
+[  5]   4.00-5.01   sec   160 MBytes  1.33 Gbits/sec    9    621 KBytes
+[  5]   5.01-6.00   sec   162 MBytes  1.38 Gbits/sec    8    621 KBytes
+[  5]   6.00-7.00   sec   155 MBytes  1.30 Gbits/sec    6    923 KBytes
+[  5]   7.00-8.00   sec   159 MBytes  1.33 Gbits/sec    7   1.04 MBytes
+[  5]   8.00-9.00   sec   150 MBytes  1.25 Gbits/sec    6   1.15 MBytes
+[  5]   9.00-10.00  sec   148 MBytes  1.24 Gbits/sec    5   1.27 MBytes
+[  5]  10.00-11.00  sec   150 MBytes  1.26 Gbits/sec    6   1.27 MBytes
+[  5]  11.00-12.00  sec   162 MBytes  1.36 Gbits/sec    9   1.27 MBytes
+[  5]  12.00-13.00  sec   149 MBytes  1.24 Gbits/sec    5   1.27 MBytes
+[  5]  13.00-14.00  sec   149 MBytes  1.25 Gbits/sec    6   1.27 MBytes
+[  5]  14.00-15.00  sec   160 MBytes  1.34 Gbits/sec   12   1.27 MBytes
+[  5]  15.00-16.00  sec   149 MBytes  1.25 Gbits/sec   10   1.27 MBytes
+[  5]  16.00-17.00  sec   149 MBytes  1.25 Gbits/sec   10   1.27 MBytes
+[  5]  17.00-18.00  sec   160 MBytes  1.34 Gbits/sec    9   1.27 MBytes
+[  5]  18.00-19.00  sec   175 MBytes  1.47 Gbits/sec    4   1.27 MBytes
+[  5]  19.00-20.00  sec   164 MBytes  1.37 Gbits/sec    6   1.27 MBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-20.00  sec  3.11 GBytes  1.33 Gbits/sec  147             sender
+[  5]   0.00-20.01  sec  3.10 GBytes  1.33 Gbits/sec                  receiver
+
+iperf Done.
+pod "iperf-client" deleted from default namespace
+ ✓ iperf3 test complete. Record the Cloud Bitrate (Mbits/sec).
+
+ i TEST 3: wrk (HTTP API Load Simulation)
+   > Simulates 100 concurrent 5G users hammering the VNF Gateway with requests.
+ ? Run wrk HTTP test for 30 seconds? (y/N): y
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    94.69ms   21.38ms 255.33ms   78.84%
+    Req/Sec   263.29     44.68   500.00     79.93%
+  31485 requests in 30.11s, 34.95MB read
+Requests/sec:   1045.80
+Transfer/sec:      1.16MB
+pod "wrk-client" deleted from default namespace
+ ✓ wrk test complete. Record the Cloud Requests/sec and Latency.
+
+## client
+
+=========== TASK C: VNF DEPLOYMENT & HELLO WORLD (EDGE) ===========
+ i Applying 5G Service Chain Manifests (Firewall -> Gateway -> Backend)...
+configmap/firewall-config unchanged
+deployment.apps/edge-firewall-vnf configured
+service/edge-firewall-svc unchanged
+configmap/dpi-config configured
+deployment.apps/dpi-inspector-vnf configured
+service/dpi-inspector-svc unchanged
+configmap/haproxy-config unchanged
+deployment.apps/mec-gateway-vnf configured
+service/mec-gateway-svc unchanged
+deployment.apps/target-servers configured
+service/iperf-server-svc unchanged
+service/web-server-svc unchanged
+ ✓ Manifests applied.
+ i Waiting for all pods in default namespace to reach 'Ready' state (Timeout: 90s)...
+pod/dpi-inspector-vnf-666ff78f8b-5hl74 condition met
+pod/dpi-inspector-vnf-69564c6579-cklbf condition met
+ i Edge Pods Currently Running:
+  > NAME                                 READY   STATUS    RESTARTS   AGE
+  > dpi-inspector-vnf-69564c6579-cklbf   1/1     Running   0          92s
+  > edge-firewall-vnf-796666578b-2hvjw   1/1     Running   0          93s
+  > mec-gateway-vnf-fd8f646-gmbft        1/1     Running   0          92s
+  > target-servers-856b649575-m8lvw      2/2     Running   0          91s
+ ? Run the 'Hello World' Connectivity Test now? (y/N): y
+ i Executing HTTP GET request through the Firewall -> Gateway chain...
+ ⚠ If this succeeds, you will see the 'Welcome to nginx!' HTML.
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+<title>Welcome to nginx!</title>
+pod "debug-client" deleted from default namespace
+ ✓ Hello World validation complete! Edge VNF chain is routing correctly.
+azureuser@vm-edge:~$ ./exec.sh test
+
+=========== TASK D: EXPERIMENTAL LOAD TESTING (EDGE) ===========
+ i Ensure you are watching the Edge VM metrics on your Cloud Grafana dashboard.
+
+ i TEST 1: ICMP Ping (Baseline Edge Latency)
+   > Pinging the Edge Firewall Pod directly.
+ ? Run Ping test? (y/N): y
+ i Extracted Firewall Pod IP: 10.42.0.50
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+64 bytes from 10.42.0.50: seq=1 ttl=64 time=0.080 ms
+64 bytes from 10.42.0.50: seq=2 ttl=64 time=0.077 ms
+64 bytes from 10.42.0.50: seq=3 ttl=64 time=0.129 ms
+64 bytes from 10.42.0.50: seq=4 ttl=64 time=0.102 ms
+
+--- 10.42.0.50 ping statistics ---
+5 packets transmitted, 5 packets received, 0% packet loss
+round-trip min/avg/max = 0.077/0.116/0.192 ms
+pod "ping-client" deleted from default namespace
+ ✓ Ping test complete. Record the Edge latency (ms).
+
+ i TEST 2: iperf3 (TCP Throughput via Service Chain)
+   > Floods the Edge Firewall with TCP packets to test the K3s bandwidth ceiling.
+ ? Run iperf3 test for 20 seconds? (y/N): y
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   115 MBytes   964 Mbits/sec   13    629 KBytes
+[  5]   1.00-2.00   sec   111 MBytes   932 Mbits/sec   10    629 KBytes
+[  5]   2.00-3.00   sec   112 MBytes   944 Mbits/sec    4    629 KBytes
+[  5]   3.00-4.00   sec   118 MBytes   986 Mbits/sec    5    629 KBytes
+[  5]   4.00-5.00   sec   119 MBytes   993 Mbits/sec   15    629 KBytes
+[  5]   5.00-6.00   sec   119 MBytes   997 Mbits/sec    3    629 KBytes
+[  5]   6.00-7.00   sec   111 MBytes   935 Mbits/sec   12    629 KBytes
+[  5]   7.00-8.00   sec   109 MBytes   912 Mbits/sec   14    629 KBytes
+[  5]   8.00-9.00   sec   110 MBytes   923 Mbits/sec    9    629 KBytes
+[  5]   9.00-10.00  sec   115 MBytes   965 Mbits/sec    7    629 KBytes
+[  5]  10.00-11.00  sec   111 MBytes   933 Mbits/sec    2    629 KBytes
+[  5]  11.00-12.00  sec   104 MBytes   871 Mbits/sec    4    629 KBytes
+[  5]  12.00-13.00  sec   105 MBytes   880 Mbits/sec    7    629 KBytes
+[  5]  13.00-14.00  sec  98.8 MBytes   829 Mbits/sec    8    629 KBytes
+[  5]  14.00-15.00  sec   109 MBytes   912 Mbits/sec   12    629 KBytes
+[  5]  15.00-16.00  sec   114 MBytes   954 Mbits/sec    5    629 KBytes
+[  5]  16.00-17.00  sec   112 MBytes   944 Mbits/sec    9    629 KBytes
+[  5]  17.00-18.00  sec   111 MBytes   933 Mbits/sec   14    629 KBytes
+[  5]  18.00-19.00  sec   109 MBytes   912 Mbits/sec    7    629 KBytes
+[  5]  19.00-20.00  sec   118 MBytes   986 Mbits/sec    4    629 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-20.00  sec  2.18 GBytes   935 Mbits/sec  164             sender
+[  5]   0.00-20.00  sec  2.17 GBytes   931 Mbits/sec                  receiver
+
+iperf Done.
+pod "iperf-client" deleted from default namespace
+ ✓ iperf3 test complete. Record the Edge Bitrate (Mbits/sec).
+
+ i TEST 3: wrk (HTTP API Load Simulation)
+   > Simulates 100 concurrent users hitting the Edge Service Chain.
+ ? Run wrk HTTP test for 30 seconds? (y/N): y
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   163.63ms   29.00ms 336.71ms   66.34%
+    Req/Sec   152.43     35.18   270.00     68.04%
+  18228 requests in 30.04s, 20.23MB read
+Requests/sec:    606.83
+Transfer/sec:    689.80KB
+pod "wrk-client" deleted from default namespace
+ ✓ wrk test complete. Record the Edge Requests/sec and Latency.
+
