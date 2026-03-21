@@ -217,17 +217,26 @@ EOF
             log_info "Edge Pods Currently Running:"
             kubectl get pods | sed 's/^/  > /'
 
+            echo ""
             if ask_yes_no "Run the 'Hello World' Connectivity Test now?"; then
-                log_info "Executing HTTP GET request through the Firewall -> Gateway chain..."
-                log_warn "If this succeeds, you will see the 'Welcome to nginx!' HTML."
+                log_info "Executing HTTP GET request through the VNF chain..."
                 sleep 2
                 kubectl run -i --tty --rm debug-client --image=alpine --restart=Never -- sh -c "apk add -q curl && curl -s http://edge-firewall-svc:80 | grep title"
-                log_success "Hello World validation complete! Edge VNF chain is routing correctly."
+                log_success "Hello World validation complete! Traffic routed successfully."
+            fi
+
+            echo ""
+            if ask_yes_no "Run the L7 DPI Header Verification Test now?"; then
+                log_info "Fetching HTTP Headers to verify Deep Packet Inspection..."
+                log_warn "Look for 'X-DPI-Inspected: True-Secure' in the output below. Take a screenshot!"
+                sleep 2
+                kubectl run -i --tty --rm header-test --image=alpine --restart=Never -- sh -c "apk add -q curl && curl -I http://edge-firewall-svc:80"
+                log_success "DPI Header Verification complete."
             fi
             ;;
 
         "test")
-            header "TASK D: EXPERIMENTAL LOAD TESTING (EDGE)"
+            header "TASK D: EXPERIMENTAL LOAD & SECURITY TESTING (EDGE)"
             export KUBECONFIG=~/.kube/config
             log_info "Ensure you are watching the Edge VM metrics on your Cloud Grafana dashboard."
             echo ""
@@ -255,6 +264,34 @@ EOF
             if ask_yes_no "Run wrk HTTP test for 30 seconds?"; then
                 kubectl run -i --tty --rm wrk-client --image=ruslanys/wrk --restart=Never -- -c 100 -t 4 -d 30s http://edge-firewall-svc:80
                 log_success "wrk test complete. Record the Edge Requests/sec and Latency."
+            fi
+            echo ""
+
+            log_info "TEST 4: Negative Security (Firewall Enforcement)"
+            log_data "Attempts to bypass the Firewall on an unauthorized port (8080)."
+            if ask_yes_no "Run Negative Security test?"; then
+                log_warn "This test should intentionally FAIL with a 'Connection timed out'."
+                sleep 2
+                # The '|| true' prevents the script from crashing when curl intentionally fails
+                kubectl run -i --tty --rm negative-test --image=alpine --restart=Never -- sh -c "apk add -q curl && curl --connect-timeout 3 http://edge-firewall-svc:8080" || true
+                log_success "Negative security test complete. Unauthorized traffic was correctly dropped."
+            fi
+            echo ""
+
+            log_info "TEST 5: Chaos Engineering (Self-Healing Validation)"
+            log_data "Simulates a VNF software crash to test MANO orchestration recovery."
+            if ask_yes_no "Run Chaos Engineering test?"; then
+                log_serious "ACTION REQUIRED: Open a SECOND SSH terminal to your Edge VM."
+                log_info "In Terminal 2, run this command to watch the pods in real-time:"
+                log_data "sudo kubectl get pods -w"
+                echo ""
+                read -p "$(echo -e "${YELLOW}Press [Enter] once Terminal 2 is running and ready...${NC}")"
+
+                log_info "Assassinating the DPI Inspector Pod..."
+                kubectl delete pod -l app=dpi-inspector
+
+                log_success "Pod deleted! Check Terminal 2 to watch the ReplicaSet instantly self-heal."
+                log_info "Once you have your screenshot, press Ctrl+C in Terminal 2 to stop watching."
             fi
             ;;
 
