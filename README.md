@@ -67,7 +67,7 @@ graph TD
 
 ### 2. Service Function Chain (SFC) Data Plane
 
-This diagram visualizes the active data flow and traffic routing through the Virtualised Network Functions during experimental load testing.
+This diagram visualises the active data flow and traffic routing through the Virtualised Network Functions during experimental load testing.
 
 ```mermaid
 flowchart TD
@@ -215,4 +215,4 @@ Once the environments are deployed (Option 05 in the scripts), utilise Option 06
 * **iperf3:** Floods the SFC with TCP packets to identify virtual network bandwidth ceilings.
 * **wrk:** Simulates 100 concurrent HTTP users to evaluate Layer 7 Deep Packet Inspection overhead.
 
-*Functional validations, such as Chaos Engineering (Pod assassination) and Negative Security (Unauthorized port blocking), are also integrated into the testing menu.*
+*Functional validations, such as Chaos Engineering (Pod assassination) and Negative Security (Unauthorised port blocking), are also integrated into the testing menu.*
