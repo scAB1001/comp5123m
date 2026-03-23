@@ -61,14 +61,14 @@ graph TD
     class K8sMaster orchestrator;
     class VNF1,VNF2,VNF3 vnflayer;
     class VM_Host,CRE nfvi;
-    
+
 ```
 
 ### 2. Service Function Chain (SFC) Data Plane
 This diagram visualizes the active data flow and traffic routing through the Virtualised Network Functions during experimental load testing.
 
 ```mermaid
-graph LR
+graph TD
     %% Define Styles
     classDef user fill:#fff,stroke:#333,stroke-width:2s,color:black;
     classDef vnf fill:#bbf,stroke:#333,stroke-width:1s,color:black;
