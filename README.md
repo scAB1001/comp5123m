@@ -14,6 +14,114 @@ The architecture emulates a **Zero-Trust 5G Network Slice** using lightweight, c
 
 By comparing the deployment of this SFC on both a heavy Cloud orchestrator and a lightweight Edge orchestrator, this project empirically evaluates TCP throughput, HTTP latency, and container runtime efficiency.
 
+### 1. ETSI MANO Implementation Diagram
+This diagram illustrates the theoretical ETSI MANO layers mapped to the project's practical Azure and Kubernetes infrastructure.
+
+```mermaid
+graph TD
+    %% Define Styles for ETSI Layers
+    classDef orchestrator fill:#f9f,stroke:#333,stroke-width:2s,color:black;
+    classDef vnflayer fill:#bbf,stroke:#333,stroke-width:1s,color:black;
+    classDef nfvi fill:#ddd,stroke:#333,stroke-width:1s,stroke-dasharray: 5 5,color:black;
+    classDef tooling fill:#fff,stroke:#333,stroke-width:1s,color:black;
+
+    subgraph User_Layer [User/Admin Layer]
+        Tooling(Personal/Lab Machine<br/>Bash Provisioners & SSH)
+        Manifest(Declarative YAML Manifest<br/>5g-service-chain.yaml)
+    end
+
+    subgraph MANO_Orchestrator [ETSI MANO Orchestrator]
+        K8sMaster(Kubernetes Control Plane<br/>kube-apiserver / kube-scheduler)
+    end
+
+    subgraph VNF_Layer [Virtualised Network Function Layer]
+        VNF1(VNF 1: Edge Firewall<br/>Pod: NGINX Alpine)
+        VNF2(VNF 2: DPI/IDS Emulator<br/>Pod: NGINX Alpine)
+        VNF3(VNF 3: MEC UPF Gateway<br/>Pod: HAProxy Alpine)
+    end
+
+    subgraph NFVI [NFVI: Azure Infrastructure]
+        VM_Host(Azure Ubuntu VM<br/>Capped Hardware Profile)
+        subgraph Runtime [Container Runtime Engine]
+            CRE(containerd / Docker Daemon)
+        end
+    end
+
+    %% Define Relationships
+    Tooling ==>|apply IaC| Manifest
+    Manifest ==>|kubectl apply| K8sMaster
+    K8sMaster ==>|declarative intent| NFVI
+    CRE ==>|instantiates| VNF1
+    CRE ==>|instantiates| VNF2
+    CRE ==>|instantiates| VNF3
+    VM_Host --- CRE
+
+    %% Assign Classes to Nodes
+    class Tooling tooling;
+    class K8sMaster orchestrator;
+    class VNF1,VNF2,VNF3 vnflayer;
+    class VM_Host,CRE nfvi;
+    
+```
+
+### 2. Service Function Chain (SFC) Data Plane
+This diagram visualizes the active data flow and traffic routing through the Virtualised Network Functions during experimental load testing.
+
+```mermaid
+graph LR
+    %% Define Styles
+    classDef user fill:#fff,stroke:#333,stroke-width:2s,color:black;
+    classDef vnf fill:#bbf,stroke:#333,stroke-width:1s,color:black;
+    classDef svc fill:#e1f5fe,stroke:#0277bd,stroke-width:1s,stroke-dasharray: 3 3,color:black;
+    classDef target fill:#ddd,stroke:#333,stroke-width:1s,color:black;
+
+    %% Components
+    User(Test Client<br/>wrk / iperf3)
+
+    subgraph K8s_Network [Kubernetes Cluster Networking]
+        KubeProxy(kube-proxy<br/>iptables routing)
+
+        subgraph VNF_1 [VNF 1]
+            Svc1(Service: edge-firewall-svc<br/>Port 80 / 5201)
+            Pod1(Pod: edge-firewall-vnf)
+        end
+
+        subgraph VNF_2 [VNF 2]
+            Svc2(Service: dpi-inspector-svc<br/>Port 80 / 5201)
+            Pod2(Pod: dpi-inspector-vnf)
+        end
+
+        subgraph VNF_3 [VNF 3]
+            Svc3(Service: mec-gateway-svc<br/>Port 80 / 5201)
+            Pod3(Pod: mec-gateway-vnf)
+        end
+
+        subgraph Target [Backend Applications]
+            SvcT(Service: web-server-svc)
+            PodT(Pod: target-servers)
+        end
+    end
+
+    %% Data Flow (Data Plane)
+    User ==>|1. Ingress| Svc1
+    Svc1 -.->|2. Resolve| KubeProxy
+    KubeProxy ==>|3. L4 Admission Control| Pod1
+    Pod1 ==>|4. Forward| Svc2
+    Svc2 ==>|5. L7 Deep Packet Inspection<br/>Header Modification| Pod2
+    Pod2 ==>|6. Forward| Svc3
+    Svc3 ==>|7. L7 UPF Traffic Engineering| Pod3
+    Pod3 ==>|8. Egress| SvcT
+    SvcT ==> PodT
+
+    %% Assign Classes
+    class User user;
+    class KubeProxy svc;
+    class Svc1,Svc2,Svc3,SvcT svc;
+    class Pod1,Pod2,Pod3 vnf;
+    class PodT target;
+
+```
+
 ## 📂 Repository Structure & File Placements
 
 The files in this repository are designed to be distributed across your local machine and the respective Azure Virtual Machines.
