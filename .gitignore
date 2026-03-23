@@ -1,0 +1,6 @@
+*.pem
+*copy*
+cloudsim*
+*z*
+.env
+git.sh

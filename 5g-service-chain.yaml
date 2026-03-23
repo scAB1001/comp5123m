@@ -1,0 +1,244 @@
+---
+# ==============================================================================
+# 5G SERVICE FUNCTION CHAIN (SFC) MANIFEST
+# Architecture: ETSI MANO via Kubernetes (K3s/Minikube Orchestrator)
+# Scenario: Zero-Trust Slicing as a Service (SlaaS) for Edge Computing
+# Topology: VNF 1 (Firewall) -> VNF 2 (DPI Inspector) -> VNF 3 (UPF Gateway) -> Target
+# ==============================================================================
+
+# ==============================================================================
+# VNF 1: EDGE SECURITY FIREWALL (NGINX)
+# Role: Admission Control and initial ingress filtering at the network boundary.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: firewall-config
+data:
+  # Intent-Based configuration: Routes L4 (TCP) and L7 (HTTP) traffic to VNF 2
+  nginx.conf: |
+    events { worker_connections 1024; }
+    stream {
+        server { listen 5201; proxy_pass dpi-inspector-svc:5201; }
+    }
+    http {
+        server {
+            listen 80;
+            location / { proxy_pass http://dpi-inspector-svc:80; }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-firewall-vnf
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: edge-firewall } }
+  template:
+    metadata: { labels: { app: edge-firewall } }
+    spec:
+      containers:
+      - name: nginx-firewall
+        image: nginx:alpine # Lightweight microservice for Edge consolidation
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        # Strict capacity allocation to prevent Edge node resource exhaustion
+        resources:
+          requests: { memory: "100Mi", cpu: "200m" }
+          limits: { memory: "100Mi", cpu: "200m" }
+      volumes:
+      - name: config-volume
+        configMap: { name: firewall-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-firewall-svc
+spec:
+  # Internal load balancer managed by kube-proxy (iptables)
+  selector: { app: edge-firewall }
+  ports:
+    - name: tcp-iperf
+      port: 5201
+    - name: http-web
+      port: 80
+
+---
+# ==============================================================================
+# VNF 2: DEEP PACKET INSPECTION (DPI) / IDS EMULATOR (NGINX)
+# Role: Lawful Interception & active Layer 7 header manipulation.
+# Serves as the primary computational stressor for the Edge node.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dpi-config
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+    stream {
+        server { listen 5201; proxy_pass mec-gateway-svc:5201; }
+    }
+    http {
+        server {
+            listen 80;
+            # Emulating L7 DPI: Actively modifies payload headers before forwarding
+            add_header X-DPI-Inspected "True-Secure";
+            location / { proxy_pass http://mec-gateway-svc:80; }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dpi-inspector-vnf
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: dpi-inspector } }
+  template:
+    metadata: { labels: { app: dpi-inspector } }
+    spec:
+      containers:
+      - name: nginx-dpi
+        image: nginx:alpine
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        resources:
+          # Slightly higher CPU limit due to computational overhead of header injection
+          requests: { memory: "100Mi", cpu: "250m" }
+          limits: { memory: "100Mi", cpu: "250m" }
+      volumes:
+      - name: config-volume
+        configMap: { name: dpi-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dpi-inspector-svc
+spec:
+  selector: { app: dpi-inspector }
+  ports:
+    - name: tcp-iperf
+      port: 5201
+    - name: http-web
+      port: 80
+
+---
+# ==============================================================================
+# VNF 3: MEC UPF GATEWAY (HAProxy)
+# Role: User Plane Function. High-concurrency traffic engineering and
+# final load balancing to the backend target services.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+data:
+  haproxy.cfg: |
+    global
+        maxconn 1024
+    defaults
+        timeout connect 5000ms
+        timeout client  50000ms
+        timeout server  50000ms
+    frontend iperf_front
+        mode tcp
+        bind *:5201
+        default_backend iperf_back
+    backend iperf_back
+        mode tcp
+        server iperf_srv iperf-server-svc:5201
+    frontend http_front
+        mode http
+        bind *:80
+        default_backend http_back
+    backend http_back
+        mode http
+        server web_srv web-server-svc:80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mec-gateway-vnf
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: mec-gateway } }
+  template:
+    metadata: { labels: { app: mec-gateway } }
+    spec:
+      containers:
+      - name: haproxy
+        image: haproxy:alpine # Highly efficient C-based routing microservice
+        volumeMounts:
+        - name: config-volume
+          mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          subPath: haproxy.cfg
+        resources:
+          requests: { memory: "100Mi", cpu: "200m" }
+          limits: { memory: "100Mi", cpu: "200m" }
+      volumes:
+      - name: config-volume
+        configMap: { name: haproxy-config }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mec-gateway-svc
+spec:
+  selector: { app: mec-gateway }
+  ports:
+    - name: tcp-iperf
+      port: 5201
+    - name: http-web
+      port: 80
+
+---
+# ==============================================================================
+# TARGET BACKEND SERVICES
+# Role: Sink for telemetry and load testing. Simulates the final edge applications.
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: target-servers
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: target-servers } }
+  template:
+    metadata: { labels: { app: target-servers } }
+    spec:
+      containers:
+      - name: iperf3
+        image: networkstatic/iperf3:latest
+        args: ["-s"]
+        resources:
+          requests: { memory: "50Mi", cpu: "100m" }
+          limits: { memory: "100Mi", cpu: "200m" }
+      - name: nginx-web
+        image: nginx:alpine
+        resources:
+          requests: { memory: "50Mi", cpu: "100m" }
+          limits: { memory: "100Mi", cpu: "200m" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iperf-server-svc
+spec:
+  selector: { app: target-servers }
+  ports:
+    - port: 5201
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-server-svc
+spec:
+  selector: { app: target-servers }
+  ports:
+    - port: 80
