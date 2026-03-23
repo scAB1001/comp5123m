@@ -15,6 +15,7 @@ The architecture emulates a **Zero-Trust 5G Network Slice** using lightweight, c
 By comparing the deployment of this SFC on both a heavy Cloud orchestrator and a lightweight Edge orchestrator, this project empirically evaluates TCP throughput, HTTP latency, and container runtime efficiency.
 
 ### 1. ETSI MANO Implementation Diagram
+
 This diagram illustrates the theoretical ETSI MANO layers mapped to the project's practical Azure and Kubernetes infrastructure.
 
 ```mermaid
@@ -65,6 +66,7 @@ graph TD
 ```
 
 ### 2. Service Function Chain (SFC) Data Plane
+
 This diagram visualizes the active data flow and traffic routing through the Virtualised Network Functions during experimental load testing.
 
 ```mermaid
@@ -130,8 +132,7 @@ The files in this repository are designed to be distributed across your local ma
 
 These files remain on your local machine to manage remote access and version control:
 * `connect.sh`: An interactive SSH manager with environment variable loading.
-* `.env.example`: Template for SSH configurations (IPs, Usernames, Passwords).
-* `git.sh`: Automation script for Git operations.
+* `.env`: Template for SSH configurations (IPs, Usernames, Passwords).
 
 ### 2. Azure Cloud VM (`vm-ab`)
 
@@ -169,19 +170,17 @@ Ensure the following inbound port rules are configured on the VMs:
 1. Clone this repository to your local machine.
 2. Place your Azure `.pem` key files into the root directory.
 3. Copy the environment template and fill in your specific Azure details:
-```text
-AZURE_USER=
-CLOUD_VM_IP=
-CLOUD_KEY_FILE=
-EDGE_VM_IP=
-EDGE_KEY_FILE=
-GRAFANA_PASS=
-
-```
+  ```text
+  AZURE_USER=
+  CLOUD_VM_IP=
+  CLOUD_KEY_FILE=
+  EDGE_VM_IP=
+  EDGE_KEY_FILE=
+  GRAFANA_PASS=
+  ```
 4. Run the SSH manager to connect to your VMs:
    ```bash
    ./connect.sh
-
    ```
 
 ### Step 2: Environment Orchestration
@@ -192,14 +191,16 @@ SSH into your respective VMs, copy and then execute the master scripts. The scri
 
 **On the Cloud VM:**
 ```bash
+# Make executable
 chmod +x bootstrap-cloud.sh
-./bootstrap-cloud.sh
+sudo ./bootstrap-cloud.sh
 ```
 
 **On the Edge VM:**
 ```bash
+# Make executable
 chmod +x bootstrap-edge.sh
-./bootstrap-edge.sh
+sudo ./bootstrap-edge.sh
 ```
 
 ### Step 3: Experimental Load Testing
@@ -210,4 +211,3 @@ Once the environments are deployed (Option 05 in the scripts), utilise Option 06
 * **wrk:** Simulates 100 concurrent HTTP users to evaluate Layer 7 Deep Packet Inspection overhead.
 
 *Functional validations, such as Chaos Engineering (Pod assassination) and Negative Security (Unauthorized port blocking), are also integrated into the testing menu.*
-```
