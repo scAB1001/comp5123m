@@ -70,7 +70,7 @@ graph TD
 This diagram visualizes the active data flow and traffic routing through the Virtualised Network Functions during experimental load testing.
 
 ```mermaid
-graph TD
+flowchart TD
     %% Define Styles
     classDef user fill:#fff,stroke:#333,stroke-width:2s,color:black;
     classDef vnf fill:#bbf,stroke:#333,stroke-width:1s,color:black;
@@ -81,24 +81,29 @@ graph TD
     User(Test Client<br/>wrk / iperf3)
 
     subgraph K8s_Network [Kubernetes Cluster Networking]
+        direction TD
         KubeProxy(kube-proxy<br/>iptables routing)
 
         subgraph VNF_1 [VNF 1]
+            direction LR
             Svc1(Service: edge-firewall-svc<br/>Port 80 / 5201)
             Pod1(Pod: edge-firewall-vnf)
         end
 
         subgraph VNF_2 [VNF 2]
+            direction LR
             Svc2(Service: dpi-inspector-svc<br/>Port 80 / 5201)
             Pod2(Pod: dpi-inspector-vnf)
         end
 
         subgraph VNF_3 [VNF 3]
+            direction LR
             Svc3(Service: mec-gateway-svc<br/>Port 80 / 5201)
             Pod3(Pod: mec-gateway-vnf)
         end
 
         subgraph Target [Backend Applications]
+            direction LR
             SvcT(Service: web-server-svc)
             PodT(Pod: target-servers)
         end
@@ -170,14 +175,14 @@ Ensure the following inbound port rules are configured on the VMs:
 1. Clone this repository to your local machine.
 2. Place your Azure `.pem` key files into the root directory.
 3. Copy the environment template and fill in your specific Azure details:
-  ```text
-  AZURE_USER=
-  CLOUD_VM_IP=
-  CLOUD_KEY_FILE=
-  EDGE_VM_IP=
-  EDGE_KEY_FILE=
-  GRAFANA_PASS=
-  ```
+    ```text
+    AZURE_USER=
+    CLOUD_VM_IP=
+    CLOUD_KEY_FILE=
+    EDGE_VM_IP=
+    EDGE_KEY_FILE=
+    GRAFANA_PASS=
+    ```
 4. Run the SSH manager to connect to your VMs:
    ```bash
    ./connect.sh
