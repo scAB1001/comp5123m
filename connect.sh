@@ -31,7 +31,7 @@ load_env() {
         done < "$env_file"
     else
         log_warn "No .env file found at $env_file!"
-        echo "Please copy .env.example to .env and fill in your Azure VM details."
+        echo "Copy .env and fill in your Azure VM details."
         exit 1
     fi
 }
@@ -67,9 +67,8 @@ exec_cmd() {
             firefox "http://${CLOUD_VM_IP}:9090/query" &>/dev/null &
             sleep 1
             ;;
-        "grafana"|4)
+        "graf"|4)
             log_info "Launching Grafana in Firefox..."
-            # Pulls the password from the .env file so you can easily copy it
             log_data "Grafana Password: ${GRAFANA_PASS}"
             firefox "http://${CLOUD_VM_IP}:3000" &>/dev/null &
             sleep 1
@@ -89,7 +88,7 @@ show_menu() {
     echo -e "  1) $(opt "cloud")        Connect to Cloud Server (${CLOUD_VM_IP})"
     echo -e "  2) $(opt "edge")         Connect to Edge Client  (${EDGE_VM_IP})"
     echo -e "  3) $(opt "prom")         Open Prometheus Web UI  (Firefox)"
-    echo -e "  4) $(opt "grafana")      Open Grafana Web UI     (Firefox)"
+    echo -e "  4) $(opt "graf")         Open Grafana Web UI     (Firefox)"
     echo -e "  q) Quit"
     echo -ne "\n  Select an option: "
 
@@ -99,8 +98,8 @@ show_menu() {
     case $user_opt in
         1|cloud|server)     run_script "cloud" ;;
         2|edge|client)      run_script "edge" ;;
-        3|prom)             run_script "prom" ;;
-        4|grafana)          run_script "grafana" ;;
+        3|prom|prometheus)  run_script "prom" ;;
+        4|graf|grafana)     run_script "graf" ;;
         q|quit|exit)        log_success "Exiting..."; exit 0 ;;
         *)                  echo -e "Invalid option.\n"; sleep 1; show_menu ;;
     esac
@@ -116,13 +115,13 @@ run_script() {
     show_menu
 }
 
-# --- Script Initialization ---
+# --- Script Initialisation ---
 load_env
 log_info "Checking current Public IP (for Azure NSG Whitelisting):"
 PUBLIC_IP=$(curl -s ifconfig.me)
 echo -e "  > ${BOLD}$PUBLIC_IP${NC}\n"
 
-# Checks if a CLI argument was passed (e.g., ./connect.sh cloud)
+# Usage: ./connect.sh cloud
 if [ -z "$1" ]; then
     show_menu
 else
