@@ -5,7 +5,7 @@ cloudsim*
 .env
 git.sh
 *.py
-*.png
 *version
 *.toml
 *.lock
+.venv

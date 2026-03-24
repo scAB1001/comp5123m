@@ -219,3 +219,20 @@ It should look like this:
 [![Watch the video](https://img.youtube.com/vi/W62EZOqMJYI/maxresdefault.jpg)](https://youtu.be/W62EZOqMJYI)
 
 *Functional validations, such as Chaos Engineering (Pod assassination) and Negative Security (Unauthorised port blocking), are also integrated into the testing menu.*
+
+### Step 4: Distributed Telemetry & Observability (Prometheus/Grafana)
+
+The orchestration scripts automatically provision a **Hub and Spoke** monitoring architecture to extract real-time hardware telemetry during the load tests.
+
+  * **The Hub (Cloud VM):** Hosts the Prometheus time-series database and the Grafana visualisation server.
+  * **The Spoke (Edge VM):** Runs a lightweight `node_exporter` daemon that allows the Cloud VM to remotely scrape its hardware metrics.
+
+To view the dashboard:
+
+1.  Ensure both environments are running via Option `05` (`up`) in the bootstrap scripts.
+2.  On your local machine, run `./connect.sh` and select the **Grafana** option to securely open the web UI.
+3.  Import the official **Node Exporter Full** dashboard (ID: `1860`).
+
+> *Example: Grafana dashboard capturing Edge VM (K3s) telemetry during a 100-user `wrk` load simulation. The distinct split in the CPU graph illustrates the division between kernel-level network routing (System) and application-level payload inspection (User), while Memory remains strictly static.*
+
+![Example Figure: VM Edge Telemetry](results/vm_edge_telemetry.png)

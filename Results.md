@@ -1,3 +1,5 @@
+# Task E / Q5
+
 ## Results
 
 ### Tablularised Data
@@ -16,11 +18,11 @@
 
 *Figure 1: Comparative performance analysis of the 3-VNF Service Function Chain across Cloud and Edge orchestrators.*
 
-![image](/nfv_performance_analysis.png)
+![Figure 1: Performance Analysis](results/nfv_performance_analysis.png)
 
 *Figure 2: Edge node hardware telemetry during the 30-second wrk load simulation. Note the static memory footprint and the division of CPU kernel (System) vs. application (User) processing.*
 
-![image](/graf-3.png)
+![Figure 2: VM Edge Telemetry](results/vm_edge_telemetry.png)
 
 ## Discussion
 
@@ -46,19 +48,18 @@ Carmen Carrión. 2022. Kubernetes Scheduling: Taxonomy, Ongoing Issues and Chall
 
 **Figure A1: Comprehensive hardware telemetry for the Edge VM (K3s) during the 30-second Layer 7 load simulation.**
 
-![image](/graf-1.png)
+![Figure A1: Basic CPU and Network Telemtry](results/basic_cpu_network_telemetry.png)
 
 > *This consolidated view illustrates the holistic impact of the 100-user `wrk` test. It visually correlates the direct relationship between the sudden surge in ingress/egress network traffic (bottom left) and the corresponding CPU processing spike (top left). Notably, both Memory allocation and Disk space remain entirely static, demonstrating the lightweight nature of the deployed containerised VNFs.*
 
 **Figure A2: Packet-level network traffic analysis isolating virtual interface activity on the Edge node.**
 
-![image](/graf-2.png)
+![Figure A2: Packet-level Network Traffic](results/packet_network_traffic.png)
 
 > *This graph details the packets-per-second (p/s) flow across multiple virtual ethernet (`veth`) interfaces. The simultaneous, mirrored spikes across these distinct interfaces visually represent the internal Kubernetes Service Graph actively routing the simulated 5G traffic through the sequential 3-VNF pipeline (Firewall $\rightarrow$ DPI $\rightarrow$ UPF Gateway).*
 
 **Figure A3: Comparative analysis of Network Saturation versus Disk I/O on the Edge node.**
 
-![image](/graf-4.png)
+![Figure A3: Network Saturation vs. Disk IO](results/network_saturation_disk_io.png)
 
 > *These metrics confirm the anticipated resource distribution for a Network Functions Virtualisation (NFV) architecture. While network bandwidth and interface saturation spike significantly to accommodate the simulated HTTP payload inspection, disk throughput and IOPs (Input/Output Operations Per Second) remain practically at zero. This proves the Layer 7 Deep Packet Inspection occurs entirely in-memory without relying on disk-based swap space.*
-
