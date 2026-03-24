@@ -414,13 +414,31 @@ EOF
         # ==========================================================
         "up")
             header "STARTING CLOUD ENVIRONMENT"
-            log_info "Starting Minikube Orchestrator (Capped at 2048MB)..."
-            assert_cmd "Minikube is running." "Failed." minikube start --driver=docker --memory=2048
+            # Check if Minikube is already running to prevent hangs
+            if minikube status 2>/dev/null | grep -q "host: Running"; then
+                log_success "Minikube is already running. Skipping startup."
+            else
+                log_info "Starting Minikube Orchestrator (Capped at 2048MB)..."
+                assert_cmd "Minikube is running." "Failed." minikube start --driver=docker --memory=2048
+            fi
 
-            log_info "Starting Monitoring Stack (Prometheus, Grafana, Node Exporter)..."
-            sudo systemctl restart node_exporter 2>/dev/null || true
-            curl -X POST http://localhost:9090/-/reload 2>/dev/null || true
-            # sudo systemctl restart prometheus 2>/dev/null || true
+            # Check if Node Exporter is already running
+            if systemctl is-active --quiet node_exporter; then
+                log_success "Hardware Scraper (Node Exporter) is already running."
+            else
+                log_info "Starting Hardware Scraper (Node Exporter)..."
+                sudo systemctl start node_exporter 2>/dev/null || true
+            fi
+
+            # Check if Prometheus is running before trying to reload its config
+            if systemctl is-active --quiet prometheus; then
+                curl -X POST http://localhost:9090/-/reload 2>/dev/null || true
+                log_success "Prometheus is already running."
+            else
+                log_info "Starting Prometheus..."
+                sudo systemctl start prometheus 2>/dev/null || true
+            fi
+
             sudo systemctl restart grafana-server 2>/dev/null || true
             log_success "Cloud Environment is fully active."
             ;;

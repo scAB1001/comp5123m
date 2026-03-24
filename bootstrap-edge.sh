@@ -306,12 +306,21 @@ EOF
         # ==========================================================
         "up")
             header "STARTING EDGE ENVIRONMENT"
-            log_info "Starting K3s Orchestrator..."
-            assert_cmd "K3s is running." "Failed to start K3s." sudo systemctl start k3s
+            # Check if K3s is already running
+            if systemctl is-active --quiet k3s; then
+                log_success "K3s is already running. Skipping startup."
+            else
+                log_info "Starting K3s Orchestrator..."
+                assert_cmd "K3s is running." "Failed to start K3s." sudo systemctl start k3s
+            fi
 
-            log_info "Starting Hardware Scraper (Node Exporter)..."
-            assert_cmd "Node Exporter is running." "Failed to start Node Exporter." sudo systemctl start node_exporter
-
+            # Check if Node Exporter is already running
+            if systemctl is-active --quiet node_exporter; then
+                log_success "Hardware Scraper (Node Exporter) is already running."
+            else
+                log_info "Starting Hardware Scraper (Node Exporter)..."
+                sudo systemctl start node_exporter 2>/dev/null || true
+            fi
             log_success "Edge Environment is fully active."
             ;;
 

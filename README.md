@@ -215,4 +215,7 @@ Once the environments are deployed (Option 05 in the scripts), utilise Option 06
 * **iperf3:** Floods the SFC with TCP packets to identify virtual network bandwidth ceilings.
 * **wrk:** Simulates 100 concurrent HTTP users to evaluate Layer 7 Deep Packet Inspection overhead.
 
+It should look like this:
+[![Watch the video](https://img.youtube.com/vi/W62EZOqMJYI/maxresdefault.jpg)](https://youtu.be/W62EZOqMJYI)
+
 *Functional validations, such as Chaos Engineering (Pod assassination) and Negative Security (Unauthorised port blocking), are also integrated into the testing menu.*
