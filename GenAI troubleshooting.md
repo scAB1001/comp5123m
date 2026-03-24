@@ -1,6 +1,7 @@
 # GenAI Troubleshooting Log
 
 **Tool Used:** M365 Microsoft Copilot (In-line completions and Chat)
+
 **Statement of Compliance:** In accordance with the coursework regulations, Generative AI was used strictly in an assistive capacity for troubleshooting, diagnosing system faults, and clarifying error messages. All core architectural designs, infrastructure-as-code (IaC) scripts, ETSI MANO Kubernetes manifests, and experimental data analyses are original contributions.
 
 ---
