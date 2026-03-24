@@ -15,7 +15,6 @@ kind: ConfigMap
 metadata:
   name: firewall-config
 data:
-  # Intent-Based configuration: Routes L4 (TCP) and L7 (HTTP) traffic to VNF 2
   nginx.conf: |
     events { worker_connections 1024; }
     stream {
@@ -40,12 +39,11 @@ spec:
     spec:
       containers:
       - name: nginx-firewall
-        image: nginx:alpine # Lightweight microservice for Edge consolidation
+        image: nginx:alpine
         volumeMounts:
         - name: config-volume
           mountPath: /etc/nginx/nginx.conf
           subPath: nginx.conf
-        # Strict capacity allocation to prevent Edge node resource exhaustion
         resources:
           requests: { memory: "100Mi", cpu: "200m" }
           limits: { memory: "100Mi", cpu: "200m" }
@@ -58,7 +56,6 @@ kind: Service
 metadata:
   name: edge-firewall-svc
 spec:
-  # Internal load balancer managed by kube-proxy (iptables)
   selector: { app: edge-firewall }
   ports:
     - name: tcp-iperf
@@ -109,7 +106,6 @@ spec:
           mountPath: /etc/nginx/nginx.conf
           subPath: nginx.conf
         resources:
-          # Slightly higher CPU limit due to computational overhead of header injection
           requests: { memory: "100Mi", cpu: "250m" }
           limits: { memory: "100Mi", cpu: "250m" }
       volumes:
@@ -173,7 +169,7 @@ spec:
     spec:
       containers:
       - name: haproxy
-        image: haproxy:alpine # Highly efficient C-based routing microservice
+        image: haproxy:alpine
         volumeMounts:
         - name: config-volume
           mountPath: /usr/local/etc/haproxy/haproxy.cfg
