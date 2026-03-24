@@ -4,7 +4,6 @@ cloudsim*
 *z*
 .env
 git.sh
-*.py
 *version
 *.toml
 *.lock
