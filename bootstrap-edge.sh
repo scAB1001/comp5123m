@@ -4,7 +4,7 @@
 # Role: Provisions the lightweight "Edge-like" VM, hardware scraper, and VNF.
 # Architecture: Alpine/Ubuntu (Host) -> K3s (K8s) -> Node Exporter (Target)
 # ==============================================================================
-set -e # Exit immediately if a command exits with a non-zero status
+set -e
 
 # --- Configuration & Colors ---
 RED='\033[0;31m'
@@ -54,11 +54,11 @@ reload_systemd() {
 }
 
 get_latest_github_release() {
-    # Dynamically scrapes the latest release tag from GitHub API
+    # Scrapes the latest release tag from GitHub API
     curl -s "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/'
 }
 
-# Polling endpoint checker (prevents race conditions during service startup)
+# Re-attempts endpoint
 check_endpoint() {
     local name="$1"
     local url="$2"
@@ -193,7 +193,7 @@ EOF
                 stress-ng --cpu 4 --vm 2 --hdd 1 --fork 8 --timeout 1m --metrics || true
                 log_success "Stress test completed."
             else
-                log_info "You can run tests later manually (e.g., 'stress-ng --cpu 4 --timeout 1m')."
+                log_info "Run tests later manually (e.g., 'stress-ng --cpu 4 --timeout 1m')."
             fi
             ;;
 
@@ -234,7 +234,7 @@ EOF
             echo ""
             if ask_yes_no "Run the L7 DPI Header Verification Test now?"; then
                 log_info "Fetching HTTP Headers to verify Deep Packet Inspection..."
-                log_warn "Look for 'X-DPI-Inspected: True-Secure' in the output below. Take a screenshot!"
+                log_warn "Look for 'X-DPI-Inspected: True-Secure' in the output below."
                 sleep 2
                 kubectl run -i --tty --rm header-test --image=alpine --restart=Never -- sh -c "apk add -q curl && curl -I http://edge-firewall-svc:80"
                 log_success "DPI Header Verification complete."
@@ -244,7 +244,7 @@ EOF
         "test")
             header "TASK D: EXPERIMENTAL LOAD & SECURITY TESTING (EDGE)"
             export KUBECONFIG=~/.kube/config
-            log_info "Ensure you are watching the Edge VM metrics on your Cloud Grafana dashboard."
+            log_info "Ensure you are watching the Edge VM metrics on the Cloud Grafana dashboard."
             echo ""
 
             log_info "TEST 1: ICMP Ping (Baseline Edge Latency)"
@@ -253,7 +253,7 @@ EOF
                 VNF_POD_IP=$(kubectl get pod -l app=edge-firewall -o jsonpath='{.items[0].status.podIP}')
                 log_info "Extracted Firewall Pod IP: $VNF_POD_IP"
                 kubectl run -i --tty --rm ping-client --image=alpine --restart=Never -- sh -c "ping -c 5 $VNF_POD_IP"
-                log_success "Ping test complete. Record the Edge latency (ms)."
+                log_success "Ping test complete."
             fi
             echo ""
 
@@ -261,7 +261,7 @@ EOF
             log_data "Floods the Edge Firewall with TCP packets to test the K3s bandwidth ceiling."
             if ask_yes_no "Run iperf3 test for 20 seconds?"; then
                 kubectl run -i --tty --rm iperf-client --image=networkstatic/iperf3 --restart=Never -- -c edge-firewall-svc -t 20
-                log_success "iperf3 test complete. Record the Edge Bitrate (Mbits/sec)."
+                log_success "iperf3 test complete."
             fi
             echo ""
 
@@ -269,25 +269,24 @@ EOF
             log_data "Simulates 100 concurrent users hitting the Edge Service Chain."
             if ask_yes_no "Run wrk HTTP test for 30 seconds?"; then
                 kubectl run -i --tty --rm wrk-client --image=ruslanys/wrk --restart=Never -- -c 100 -t 4 -d 30s http://edge-firewall-svc:80
-                log_success "wrk test complete. Record the Edge Requests/sec and Latency."
+                log_success "wrk test complete."
             fi
             echo ""
 
             log_info "TEST 4: Negative Security (Firewall Enforcement)"
-            log_data "Attempts to bypass the Firewall on an unauthorized port (8080)."
+            log_data "Attempts to bypass the Firewall on an unauthorised port (8080)."
             if ask_yes_no "Run Negative Security test?"; then
                 log_warn "This test should intentionally FAIL with a 'Connection timed out'."
                 sleep 2
-                # The '|| true' prevents the script from crashing when curl intentionally fails
                 kubectl run -i --tty --rm negative-test --image=alpine --restart=Never -- sh -c "apk add -q curl && curl --connect-timeout 3 http://edge-firewall-svc:8080" || true
-                log_success "Negative security test complete. Unauthorized traffic was correctly dropped."
+                log_success "Negative security test complete. Unauthorised traffic was correctly dropped."
             fi
             echo ""
 
             log_info "TEST 5: Chaos Engineering (Self-Healing Validation)"
             log_data "Simulates a VNF software crash to test MANO orchestration recovery."
             if ask_yes_no "Run Chaos Engineering test?"; then
-                log_serious "ACTION REQUIRED: Open a SECOND SSH terminal to your Edge VM."
+                log_serious "ACTION REQUIRED: Open a SECOND SSH terminal to the Edge VM."
                 log_info "In Terminal 2, run this command to watch the pods in real-time:"
                 log_data "sudo kubectl get pods -w"
                 echo ""
@@ -296,8 +295,8 @@ EOF
                 log_info "Assassinating the DPI Inspector Pod..."
                 kubectl delete pod -l app=dpi-inspector
 
-                log_success "Pod deleted! Check Terminal 2 to watch the ReplicaSet instantly self-heal."
-                log_info "Once you have your screenshot, press Ctrl+C in Terminal 2 to stop watching."
+                log_success "Pod deleted! Check Terminal 2 to watch the ReplicaSet self-heal."
+                log_info "Press Ctrl+Z in Terminal 2 to stop watching."
             fi
             ;;
 
@@ -306,7 +305,6 @@ EOF
         # ==========================================================
         "up")
             header "STARTING EDGE ENVIRONMENT"
-            # Check if K3s is already running
             if systemctl is-active --quiet k3s; then
                 log_success "K3s is already running. Skipping startup."
             else
@@ -314,7 +312,6 @@ EOF
                 assert_cmd "K3s is running." "Failed to start K3s." sudo systemctl start k3s
             fi
 
-            # Check if Node Exporter is already running
             if systemctl is-active --quiet node_exporter; then
                 log_success "Hardware Scraper (Node Exporter) is already running."
             else
@@ -338,7 +335,7 @@ EOF
 
             log_serious "CRITICAL NETWORKING INFO:"
             log_data "Internal IP: ${GREEN}${internal_ip}${NC}"
-            log_warn "Ensure this IP is in your Cloud VM's prometheus.yml file!"
+            log_warn "Ensure this IP is in the Cloud VM's prometheus.yml file."
             echo ""
 
             log_info "Operating System:"
@@ -354,8 +351,7 @@ EOF
             log_info "Service Status:"
             systemctl is-active --quiet k3s && echo "  > K3s (Edge K8s): ACTIVE" || echo "  > K3s (Edge K8s): Stopped"
             systemctl is-active --quiet node_exporter && echo "  > Node Exporter: ACTIVE" || echo "  > Node Exporter: Stopped"
-
-            log_success "Specs retrieved. Use these to define the Edge environment in your report."
+            log_success "Specs retrieved."
             ;;
 
         "update")

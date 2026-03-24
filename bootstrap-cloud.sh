@@ -4,7 +4,7 @@
 # Role: Provisions the heavy "Cloud-like" VM, monitoring stack, and VNF deployments.
 # Architecture: Ubuntu 22.04 LTS (Host) -> Minikube (K8s) -> Prometheus/Grafana
 # ==============================================================================
-set -e # Exit immediately if a command exits with a non-zero status to prevent cascading failures
+set -e
 
 # --- Configuration & Colors ---
 RED='\033[0;31m'
@@ -26,7 +26,7 @@ log_serious()   { echo -e " ${PURPLE}${BOLD}❗${PURPLE} $1${NC}"; }
 header()        { echo -e "\n${PURPLE}${BOLD}=========== $1 ===========${NC}"; }
 opt()           { echo -e "${CYAN}$1${NC}"; }
 
-# Safely executes a command. If it fails, catches the error rather than letting 'set -e' kill the script silently.
+# Safely executes a command. If it fails, catches the error.
 assert_cmd() {
     local success_msg="$1"
     local error_msg="$2"
@@ -54,7 +54,7 @@ wait_for_pods() {
 }
 
 get_latest_github_release() {
-    # Dynamically scrapes the latest release tag from GitHub API to avoid hardcoded versions
+    # Scrapes the latest release tag from GitHub API to avoid hardcoded versions
     curl -s "https://api.github.com/repos/$1/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/'
 }
 
@@ -72,7 +72,7 @@ check_endpoint() {
     log_info "Testing $name endpoint ($url)..."
 
     for ((i=1; i<=max_attempts; i++)); do
-        # -s (silent), -I (headers only). Grep checks for HTTP response code.
+        # Grep checks for HTTP response code.
         if curl -s -I "$url" | grep -q "HTTP"; then
             log_success "$name is reachable and responding!"
             return 0
@@ -173,7 +173,7 @@ exec_cmd() {
         # --- Component Installations ---
         "docker")
             if ask_yes_no "Do you want to log into Docker Hub now?"; then
-                log_info "Enter your Docker Hub credentials:"
+                log_info "Enter Docker Hub credentials:"
                 log_warn "Note for Examiner: Password hint provided below for lab convenience. Avoid in production."
                 log_data "$:tyjcVSFL8>~hF"
                 docker login -u scab1001
@@ -191,7 +191,7 @@ exec_cmd() {
             update_packages
             assert_cmd "Docker installed." "Docker installation failed." sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null
             sudo usermod -aG docker $USER || true
-            log_serious "CRITICAL: You MUST run 'newgrp docker' in your terminal right now, or log out and back in, for group permissions to apply!"
+            log_serious "CRITICAL: You MUST run 'newgrp docker' in the terminal, or log out and back in, for group permissions to apply!"
             ;;
 
         "kubectl")
@@ -283,7 +283,6 @@ WantedBy=multi-user.target
 EOF
             reload_systemd
             assert_cmd "Prometheus enabled." "Failed." sudo systemctl enable prometheus
-            # assert_cmd "Prometheus started." "Failed." sudo systemctl restart prometheus
             curl -X POST http://localhost:9090/-/reload 2>/dev/null || true
             sleep 2
             check_endpoint "Prometheus" "http://localhost:9090/-/healthy"
@@ -343,7 +342,7 @@ EOF
             echo ""
             if ask_yes_no "Run the L7 DPI Header Verification Test now?"; then
                 log_info "Fetching HTTP Headers to verify Deep Packet Inspection..."
-                log_warn "Look for 'X-DPI-Inspected: True-Secure' in the output below. Take a screenshot!"
+                log_warn "Look for 'X-DPI-Inspected: True-Secure' in the output below."
                 sleep 2
                 kubectl run -i --tty --rm header-test --image=alpine --restart=Never -- sh -c "apk add -q curl && curl -I http://edge-firewall-svc:80"
                 log_success "DPI Header Verification complete."
@@ -353,7 +352,7 @@ EOF
         "test")
             header "TASK D: EXPERIMENTAL LOAD & SECURITY TESTING (CLOUD)"
             export KUBECONFIG=~/.kube/config
-            log_info "Ensure you are watching the Edge VM metrics on your Cloud Grafana dashboard."
+            log_info "View the Edge VM metrics on the Cloud Grafana dashboard."
             echo ""
 
             log_info "TEST 1: ICMP Ping (Baseline Edge Latency)"
@@ -362,7 +361,7 @@ EOF
                 VNF_POD_IP=$(kubectl get pod -l app=edge-firewall -o jsonpath='{.items[0].status.podIP}')
                 log_info "Extracted Firewall Pod IP: $VNF_POD_IP"
                 kubectl run -i --tty --rm ping-client --image=alpine --restart=Never -- sh -c "ping -c 5 $VNF_POD_IP"
-                log_success "Ping test complete. Record the Edge latency (ms)."
+                log_success "Ping test complete."
             fi
             echo ""
 
@@ -370,7 +369,7 @@ EOF
             log_data "Floods the Edge Firewall with TCP packets to test the K3s bandwidth ceiling."
             if ask_yes_no "Run iperf3 test for 20 seconds?"; then
                 kubectl run -i --tty --rm iperf-client --image=networkstatic/iperf3 --restart=Never -- -c edge-firewall-svc -t 20
-                log_success "iperf3 test complete. Record the Edge Bitrate (Mbits/sec)."
+                log_success "iperf3 test complete."
             fi
             echo ""
 
@@ -378,24 +377,24 @@ EOF
             log_data "Simulates 100 concurrent users hitting the Edge Service Chain."
             if ask_yes_no "Run wrk HTTP test for 30 seconds?"; then
                 kubectl run -i --tty --rm wrk-client --image=ruslanys/wrk --restart=Never -- -c 100 -t 4 -d 30s http://edge-firewall-svc:80
-                log_success "wrk test complete. Record the Edge Requests/sec and Latency."
+                log_success "wrk test complete."
             fi
             echo ""
 
             log_info "TEST 4: Negative Security (Firewall Enforcement)"
-            log_data "Attempts to bypass the Firewall on an unauthorized port (8080)."
+            log_data "Attempts to bypass the Firewall on an unauthorised port (8080)."
             if ask_yes_no "Run Negative Security test?"; then
                 log_warn "This test should intentionally FAIL with a 'Connection timed out'."
                 sleep 2
                 kubectl run -i --tty --rm negative-test --image=alpine --restart=Never -- sh -c "apk add -q curl && curl --connect-timeout 3 http://edge-firewall-svc:8080" || true
-                log_success "Negative security test complete. Unauthorized traffic was correctly dropped."
+                log_success "Negative security test complete. Unauthorised traffic was correctly dropped."
             fi
             echo ""
 
             log_info "TEST 5: Chaos Engineering (Self-Healing Validation)"
             log_data "Simulates a VNF software crash to test MANO orchestration recovery."
             if ask_yes_no "Run Chaos Engineering test?"; then
-                log_serious "ACTION REQUIRED: Open a SECOND SSH terminal to your Edge VM."
+                log_serious "ACTION REQUIRED: Open a SECOND SSH terminal to the Edge VM."
                 log_info "In Terminal 2, run this command to watch the pods in real-time:"
                 log_data "sudo kubectl get pods -w"
                 echo ""
@@ -404,8 +403,8 @@ EOF
                 log_info "Assassinating the DPI Inspector Pod..."
                 kubectl delete pod -l app=dpi-inspector
 
-                log_success "Pod deleted! Check Terminal 2 to watch the ReplicaSet instantly self-heal."
-                log_info "Once you have your screenshot, press Ctrl+C in Terminal 2 to stop watching."
+                log_success "Pod deleted! Check Terminal 2 to watch the ReplicaSet self-heal."
+                log_info "Press Ctrl+Z in Terminal 2 to stop watching."
             fi
             ;;
 
@@ -414,7 +413,6 @@ EOF
         # ==========================================================
         "up")
             header "STARTING CLOUD ENVIRONMENT"
-            # Check if Minikube is already running to prevent hangs
             if minikube status 2>/dev/null | grep -q "host: Running"; then
                 log_success "Minikube is already running. Skipping startup."
             else
@@ -422,7 +420,6 @@ EOF
                 assert_cmd "Minikube is running." "Failed." minikube start --driver=docker --memory=2048
             fi
 
-            # Check if Node Exporter is already running
             if systemctl is-active --quiet node_exporter; then
                 log_success "Hardware Scraper (Node Exporter) is already running."
             else
@@ -430,7 +427,6 @@ EOF
                 sudo systemctl start node_exporter 2>/dev/null || true
             fi
 
-            # Check if Prometheus is running before trying to reload its config
             if systemctl is-active --quiet prometheus; then
                 curl -X POST http://localhost:9090/-/reload 2>/dev/null || true
                 log_success "Prometheus is already running."
@@ -452,7 +448,7 @@ EOF
             sudo systemctl stop prometheus 2>/dev/null || true
             sudo systemctl stop node_exporter 2>/dev/null || true
             sudo systemctl stop grafana-server 2>/dev/null || true
-            log_success "All heavy services halted. Your Cloud VM is idling."
+            log_success "All heavy services halted. Cloud VM is idling."
             ;;
 
         "stats")
