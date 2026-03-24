@@ -16,13 +16,13 @@
 
 ### Grafana and Performance Graphs
 
-*Figure 1: Comparative performance analysis of the 3-VNF Service Function Chain across Cloud and Edge orchestrators.*
-
 ![Figure 1: Performance Analysis](results/nfv_performance_analysis.png)
 
-*Figure 2: Edge node hardware telemetry during the 30-second wrk load simulation. Note the static memory footprint and the division of CPU kernel (System) vs. application (User) processing.*
+*Figure 1: Comparative performance analysis of the 3-VNF Service Function Chain across Cloud and Edge orchestrators.*
 
 ![Figure 2: VM Edge Telemetry](results/vm_edge_telemetry.png)
+
+*Figure 2: Edge node hardware telemetry during the 30-second wrk load simulation. Note the static memory footprint and the division of CPU kernel (System) vs. application (User) processing.*
 
 ## Discussion
 

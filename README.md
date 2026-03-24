@@ -233,6 +233,6 @@ To view the dashboard:
 2.  On your local machine, run `./connect.sh` and select the **Grafana** option to securely open the web UI.
 3.  Import the official **Node Exporter Full** dashboard (ID: `1860`).
 
-> *Example: Grafana dashboard capturing Edge VM (K3s) telemetry during a 100-user `wrk` load simulation. The distinct split in the CPU graph illustrates the division between kernel-level network routing (System) and application-level payload inspection (User), while Memory remains strictly static.*
-
 ![Example Figure: VM Edge Telemetry](results/vm_edge_telemetry.png)
+
+> *Example: Grafana dashboard capturing Edge VM (K3s) telemetry during a 100-user `wrk` load simulation. The distinct split in the CPU graph illustrates the division between kernel-level network routing (System) and application-level payload inspection (User), while Memory remains strictly static.*
